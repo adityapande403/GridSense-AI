@@ -1,4 +1,4 @@
-﻿# GridSense-AI CI / Test Verification Script (Windows PowerShell)
+# GridSense-AI CI / Test Verification Script (Windows PowerShell)
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================================" -ForegroundColor Cyan

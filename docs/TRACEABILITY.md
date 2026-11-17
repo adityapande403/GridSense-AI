@@ -10,7 +10,7 @@
 
 | Challenge 08 Official Ask | Target Engine | Architectural Module | Milestones | Primary Verification / Acceptance Test |
 |---|---|---|---|---|
-| **Ask 1: Feeder-network mapping and modelling** | C-Engine 1, 2, 4 | `network`, `ingest`, `topology_ai`, `estimation` | M1 (PASSED), M2 (PASSED), M3, M4 | Roundtrip import/export test; synthetic consistency check (orphan nodes, loops, disconnected DTRs caught); MapLibre SLD rendering with provenance badges. |
+| **Ask 1: Feeder-network mapping and modelling** | C-Engine 1, 2, 4 | `network`, `ingest`, `topology_ai`, `estimation` | M1 (PASSED), M2 (PASSED), M3 (PASSED), M4 | Roundtrip import/export test; synthetic consistency check (orphan nodes, loops, disconnected DTRs caught); MapLibre SLD rendering with provenance badges. |
 | **Ask 2: Evaluates sectionalising and load-switching options** | C-Engine 5, 7 | `switching`, `flisr`, `physics`, `scenarios` | M5, M8, M10 | IEEE 33-bus reconfiguration loss reduction benchmark (~202.7 kW -> ~139.5 kW); top-k MILP candidate generation with mandatory AC power-flow re-validation and A5 taxonomy assignment. |
 | **Ask 3: Identifies overloaded assets** | C-Engine 3, 4 | `physics`, `thermal`, `forecast`, `alerts` | M5, M6, M7 | AC power flow transformer and line ampacity checks; IEC 60076-7 dynamic hot-spot and loss-of-life thermal stress calculation; 4-24h predictive overload alert test. |
 | **Ask 4: Ranks where additional DTRs, feeder bifurcation or conductor upgrades are needed** | C-Engine 6 | `capex` | M9, M11 | Hand-verifiable multi-criteria ranking model; cluster-weighted DTR siting; line segment loss-reduction-per-rupee ranking; bifurcation split-point graph analysis. |
@@ -65,3 +65,33 @@
   4. 100-network AC power flow convergence gate:
      - Executed across 100 seeded networks (`seed=1` to `seed=100`): **100/100 (100%) converged in AC power flow (`pandapower.runpp`)**.
   5. 21 automated unit tests passing cleanly in CI.
+
+
+### Milestone 3: Digital Twin & Topology Reconstruction & Ingestion
+- **Status:** COMPLETED & VERIFIED
+- **Date:** 2026-11-17
+- **Verification Gates Executed:**
+  1. Declarative ingestion mapping configuration (`config/ingestion_mappings.json`):
+     - Mappings established for ESRI FileGDB (KSEB / DISCOM schema), GeoJSON, and CSV.
+  2. Ingestion validation reports with row-level rejection tracking and error codes:
+     - `ERR_INVALID_GEOM`, `ERR_MISSING_ID`, `ERR_MISSING_BUS_REF`, `ERR_INVALID_NUMERIC` verified.
+  3. Real-world brownfield GIS ingestion (`FileGDBIngestionAdapter`):
+     - Validated and ingested KSEB `Puthiya Kadavu.gdb` (4 DTRs totaling 1100 kVA, 33 HT lines, 3 HT cables, 1 RMU, 8 field switches, 5 open tie points, 35 buses).
+     - Explicit connectivity mapped into `connections` table, separating topology from geometry (Principle A4-4).
+     - Authoritative `TopologyVersion` record created with 64-char SHA256 network hash.
+  4. Deterministic topological consistency engine (`TopologyConsistencyEngine`):
+     - Catches orphan nodes (`TOPO_ERR_ORPHAN_BUS`).
+     - Catches closed loops violating radiality (`TOPO_ERR_RADIAL_LOOP`).
+     - Catches disconnected DTRs (`TOPO_ERR_DISCONNECTED_DTR`).
+     - Catches voltage level mismatches across lines (`TOPO_ERR_VOLTAGE_MISMATCH`).
+     - Catches undefined switch status (`TOPO_ERR_UNDEFINED_SWITCH`).
+     - Flags duplicate asset codes (`TOPO_WARN_DUPLICATE_ASSET`).
+     - Flags consumer-DTR distance outliers (`TOPO_WARN_DISTANCE_OUTLIER`).
+  5. Geometric snapping rules engine (`SnappingRulesEngine`):
+     - Proposes candidate connections within spatial proximity threshold (e.g., 5.0m for HT lines).
+     - Strictly advisory: zero auto-mutation of authoritative topology (Principles A4-4, A4-9).
+     - Operator-approved application route logs human sign-off into `TopologyDiff` (Principle A6).
+  6. REST API routes implemented and verified:
+     - `POST /api/v1/ingest/gdb`, `POST /api/v1/ingest/geojson`, `POST /api/v1/ingest/csv`, `POST /api/v1/ingest/validate`.
+     - `POST /api/v1/topology/validate`, `GET /api/v1/topology/candidates`, `POST /api/v1/topology/candidates/approve`.
+  7. 41 automated unit tests passing cleanly in CI (100% pass rate).

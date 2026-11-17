@@ -40,7 +40,9 @@ def test_alembic_migrations_roundtrip(tmp_path):
     tables_after_downgrade = inspector.get_table_names()
     # alembic_version table may remain, but application tables must be dropped
     app_tables = [t for t in tables_after_downgrade if t != "alembic_version"]
-    assert len(app_tables) == 0, f"Expected 0 application tables after downgrade, found: {app_tables}"
+    assert len(app_tables) == 0, (
+        f"Expected 0 application tables after downgrade, found: {app_tables}"
+    )
 
     # 3. Re-upgrade to head to verify idempotency
     command.upgrade(alembic_cfg, "head")

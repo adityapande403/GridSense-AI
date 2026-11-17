@@ -149,7 +149,11 @@ def save_synthetic_network_to_db(
     # 7. Create DTRs and Consumers
     dtr_orm_lookup = {}
     for d in net_data["dtrs"]:
-        dtr = db.query(DistributionTransformer).filter(DistributionTransformer.code == d["code"]).first()
+        dtr = (
+            db.query(DistributionTransformer)
+            .filter(DistributionTransformer.code == d["code"])
+            .first()
+        )
         if not dtr:
             parent_bus = bus_orm_lookup[d["bus_id"]]
             dtr = DistributionTransformer(
@@ -171,7 +175,9 @@ def save_synthetic_network_to_db(
     for c in net_data["consumers"]:
         parent_dtr = dtr_orm_lookup.get(c["dtr_id"])
         if parent_dtr:
-            consumer = db.query(Consumer).filter(Consumer.service_number == c["service_number"]).first()
+            consumer = (
+                db.query(Consumer).filter(Consumer.service_number == c["service_number"]).first()
+            )
             if not consumer:
                 consumer = Consumer(
                     dtr_id=parent_dtr.id,

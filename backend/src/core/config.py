@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    REPO_ROOT: Path = REPO_ROOT
+    BASE_DIR: Path = REPO_ROOT
 
     # Database: default to SQLite for zero-dependency local runs and tests,
     # or PostgreSQL / PostGIS in Docker container / staging

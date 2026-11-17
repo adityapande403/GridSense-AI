@@ -24,9 +24,17 @@ def test_generator_deterministic_reproducibility():
     gen2 = TelanganaSyntheticNetworkGenerator(seed=101, archetype="mixed")
     net2 = gen2.generate(injected_scenario="normal")
 
-    assert net1["network_hash"] == net2["network_hash"], "Hashes must match identically!"
-    assert net1["initial_power_flow"]["total_losses_kw"] == net2["initial_power_flow"]["total_losses_kw"]
-    assert net1["initial_power_flow"]["min_voltage_pu"] == net2["initial_power_flow"]["min_voltage_pu"]
+    assert net1["network_hash"] == net2["network_hash"], (
+        "Hashes must match identically!"
+    )
+    assert (
+        net1["initial_power_flow"]["total_losses_kw"]
+        == net2["initial_power_flow"]["total_losses_kw"]
+    )
+    assert (
+        net1["initial_power_flow"]["min_voltage_pu"]
+        == net2["initial_power_flow"]["min_voltage_pu"]
+    )
     assert len(net1["buses"]) == len(net2["buses"])
     assert len(net1["lines"]) == len(net2["lines"])
 
@@ -61,9 +69,14 @@ def test_generator_injected_scenarios():
         results[sc] = pf
 
     # Feeder overload should have higher active losses than normal
-    assert results["feeder_overload"]["total_losses_kw"] > results["normal"]["total_losses_kw"]
+    assert (
+        results["feeder_overload"]["total_losses_kw"]
+        > results["normal"]["total_losses_kw"]
+    )
     # Undervoltage scenario should have lower minimum voltage than normal
-    assert results["undervoltage"]["min_voltage_pu"] < results["normal"]["min_voltage_pu"]
+    assert (
+        results["undervoltage"]["min_voltage_pu"] < results["normal"]["min_voltage_pu"]
+    )
 
 
 def test_generator_database_persistence(db_session: Session):
@@ -124,4 +137,6 @@ def test_100_seeded_networks_convergence_gate():
         if net["initial_power_flow"]["converged"]:
             converged_count += 1
 
-    assert converged_count == total, f"Only {converged_count}/{total} seeded networks converged!"
+    assert converged_count == total, (
+        f"Only {converged_count}/{total} seeded networks converged!"
+    )

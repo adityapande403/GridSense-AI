@@ -7,6 +7,7 @@ class LoadSnapshot(CoreBaseModel, ProvenanceMixin):
     """
     Feeder-level or substation-level load snapshot at a specific point in time.
     """
+
     __tablename__ = "load_snapshots"
 
     feeder_id = Column(Uuid(as_uuid=True), ForeignKey("feeders.id"), nullable=False, index=True)
@@ -15,17 +16,24 @@ class LoadSnapshot(CoreBaseModel, ProvenanceMixin):
     total_q_mvar = Column(Float, nullable=False)
     source_bus_voltage_pu = Column(Float, default=1.0, nullable=False)
 
-    measurements = relationship("LoadMeasurement", back_populates="snapshot", cascade="all, delete-orphan")
+    measurements = relationship(
+        "LoadMeasurement", back_populates="snapshot", cascade="all, delete-orphan"
+    )
 
 
 class LoadMeasurement(CoreBaseModel, ProvenanceMixin):
     """
     Individual DTR load allocation or measurement corresponding to a snapshot.
     """
+
     __tablename__ = "load_measurements"
 
-    snapshot_id = Column(Uuid(as_uuid=True), ForeignKey("load_snapshots.id"), nullable=False, index=True)
-    dtr_id = Column(Uuid(as_uuid=True), ForeignKey("distribution_transformers.id"), nullable=False, index=True)
+    snapshot_id = Column(
+        Uuid(as_uuid=True), ForeignKey("load_snapshots.id"), nullable=False, index=True
+    )
+    dtr_id = Column(
+        Uuid(as_uuid=True), ForeignKey("distribution_transformers.id"), nullable=False, index=True
+    )
     p_kw = Column(Float, nullable=False)
     q_kvar = Column(Float, nullable=False)
     current_a = Column(Float, nullable=True)
@@ -41,6 +49,7 @@ class WeatherObservation(CoreBaseModel, ProvenanceMixin):
     """
     Ambient temperature and weather observation for IEC 60076-7 thermal modeling.
     """
+
     __tablename__ = "weather_observations"
 
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)

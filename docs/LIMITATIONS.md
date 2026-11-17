@@ -68,7 +68,16 @@
   - Relational database persistence pipeline saving synthetic networks into immutable topology versions with audit trails.
   - Automated AC convergence verified across 100 seeded networks.
 
+### Milestone 3 Completed State & Remaining Limitations
+
+- **M3 Completed Capabilities:**
+  - Declarative ingestion configuration (`config/ingestion_mappings.json`) supporting ESRI FileGDB, GeoJSON, and CSV distribution network assets.
+  - Ingestion adapters with validation reporting, rejected row tracking, and error codes (`ERR_INVALID_GEOM`, `ERR_MISSING_ID`, `ERR_MISSING_BUS_REF`, `ERR_INVALID_NUMERIC`).
+  - Production brownfield GIS adapter ingesting KSEB Puthiya Kadavu FileGDB (4 DTRs, 33 HT lines, 3 HT cables, 1 RMU, 8 switches, 5 open tie points, 35 buses).
+  - Graph-based deterministic topological consistency engine detecting orphan buses, radial loops, disconnected DTRs, voltage level mismatches, undefined switch states, duplicate assets, and consumer distance outliers.
+  - Spatial proximity snapping rules engine proposing candidate connections without auto-mutating authoritative topology (Principles A4-4, A4-9, A6).
+  - REST API endpoints for dataset validation, GeoJSON/CSV/GDB ingestion, topology consistency verification, and candidate approval.
+
 - **Current Limitations (To be addressed in upcoming milestones):**
-  - Ingestion of arbitrary GIS files (Shapefile, GeoJSON, CSV) from disk via declarative column mapping not yet implemented (M3).
-  - Graph-based topological consistency checks (orphan nodes, loops, disconnected DTRs) not yet wired into an ingestion validator report (M3).
   - Geospatial map rendering on MapLibre GL JS not yet integrated with live backend GeoJSON endpoints (M4).
+  - Physics AC power-flow engine wrapper (M5) not yet wired to run dynamic simulation over ingested FileGDB networks.

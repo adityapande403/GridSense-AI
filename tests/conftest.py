@@ -17,7 +17,9 @@ from backend.src.core.database import Base
 @pytest.fixture(scope="session")
 def test_engine():
     """Create in-memory SQLite engine for fast, isolated testing."""
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)

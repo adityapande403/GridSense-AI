@@ -101,7 +101,7 @@ def load_ieee69_benchmark() -> pp.pandapowerNet:
         b = pp.create_bus(
             net,
             vn_kv=v_base_kv,
-            name=f"BUS_{i+1}",
+            name=f"BUS_{i + 1}",
             type="b" if i == 0 else "pq",
             zone="IEEE69",
         )
@@ -232,7 +232,9 @@ def load_ieee69_benchmark() -> pp.pandapowerNet:
             name=f"TIE_{fb}_{tb}",
             in_service=False,  # Normally open
         )
-        pp.create_switch(net, bus=from_idx, element=line_idx, et="l", closed=False, name=f"SW_TIE_{fb}_{tb}")
+        pp.create_switch(
+            net, bus=from_idx, element=line_idx, et="l", closed=False, name=f"SW_TIE_{fb}_{tb}"
+        )
 
     net.bus["provenance"] = "synthetic"
     net.line["provenance"] = "synthetic"
@@ -271,7 +273,9 @@ def verify_benchmark(net: pp.pandapowerNet) -> Dict[str, Any]:
     meta = getattr(net, "user_data", {})
     published_losses = meta.get("published_losses_kw", 0.0)
     loss_discrepancy_pct = (
-        abs(total_losses_kw - published_losses) / published_losses * 100.0 if published_losses > 0 else 0.0
+        abs(total_losses_kw - published_losses) / published_losses * 100.0
+        if published_losses > 0
+        else 0.0
     )
 
     return {

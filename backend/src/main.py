@@ -13,6 +13,7 @@ async def lifespan(app: FastAPI):
     if settings.DATABASE_URL.startswith("sqlite"):
         import backend.src.models  # noqa: F401
         from backend.src.core.database import Base, engine
+
         Base.metadata.create_all(bind=engine)
     yield
     # Shutdown sequence
@@ -45,7 +46,9 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": "InternalServerError",
-            "message": str(exc) if settings.DEBUG else "An unexpected internal server error occurred.",
+            "message": str(exc)
+            if settings.DEBUG
+            else "An unexpected internal server error occurred.",
             "path": str(request.url.path),
         },
     )

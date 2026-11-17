@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GridSense Ingestion Mappings Configuration",
+  "description": "Declarative field mappings and validation rules for GIS and tabular distribution network datasets.",
+  "version": "1.0.0",
+  "adapters": {
+    "esri_filegdb": {
+      "layers": {
+        "distribution_transformer": {
+          "target_entity": "distribution_transformer",
+          "field_mappings": {
+            "code": ["asset_id", "dtr_code", "global_id", "GlobalID"],
+            "name": ["name", "samagra_name", "previous_name"],
+            "rated_kva": ["capacity_kva", "rated_kva"],
+            "high_voltage_kv": ["high_voltage_side_volts", "nominalvoltage"],
+            "connect_from": ["connect_from_name", "connect_from_ref", "connect_from_label"],
+            "connect_to": ["connect_to_name", "connect_to_ref", "connect_to_label"],
+            "feeder_code": ["feeder_code", "survey_outgoing_feeder_id"],
+            "feeder_name": ["feeder_name"],
+            "latitude": ["asset_latitude", "latitude"],
+            "longitude": ["asset_longitude", "longitude"]
+          },
+          "defaults": {
+            "rated_kva": 100.0,
+            "high_voltage_kv": 11.0,
+            "phase_count": 3,
+            "no_load_loss_kw": 0.25,
+            "full_load_loss_kw": 1.35,
+            "percent_z": 4.5,
+            "provenance": "measured",
+            "confidence_score": 0.95
+          }
+        },
+        "ht_line": {
+          "target_entity": "line",
+          "field_mappings": {
+            "code": ["asset_id", "global_id", "GlobalID"],
+            "from_bus": ["connect_from_name", "connect_from_ref", "connect_from_label"],
+            "to_bus": ["connect_to_name", "connect_to_ref", "connect_to_label"],
+            "conductor_type": ["conductor_type", "samagra_name", "conductor_size"],
+            "measured_length": ["measured_length", "length_m"],
+            "feeder_code": ["feeder_code", "survey_outgoing_feeder_id"],
+            "feeder_name": ["feeder_name"]
+          },
+          "defaults": {
+            "conductor_type": "ACSR_Weasel",
+            "is_operational": true,
+            "provenance": "measured",
+            "confidence_score": 0.90
+          }
+        },
+        "ht_cable": {
+          "target_entity": "line",
+          "field_mappings": {
+            "code": ["asset_id", "global_id", "GlobalID"],
+            "from_bus": ["connect_from_name", "connect_from_ref"],
+            "to_bus": ["connect_to_name", "connect_to_ref"],
+            "conductor_type": ["conductor_type", "samagra_name"],
+            "measured_length": ["measured_length", "length_m"]
+          },
+          "defaults": {
+            "conductor_type": "XLPE_HT_Cable",
+            "is_operational": true,
+            "provenance": "measured",
+            "confidence_score": 0.90
+          }
+        },
+        "switch": {
+          "target_entity": "switch",
+          "field_mappings": {
+            "code": ["asset_id", "global_id", "GlobalID"],
+            "name": ["name", "samagra_name"],
+            "from_bus": ["connect_from_name", "connect_from_ref"],
+            "to_bus": ["connect_to_name", "connect_to_ref"],
+            "switch_type": ["samagra_name", "asset_type"]
+          },
+          "defaults": {
+            "switch_type": "sectionalizer",
+            "is_normally_open": false,
+            "current_status": "closed",
+            "breaking_capacity_ka": 12.5,
+            "provenance": "measured",
+            "confidence_score": 0.90
+          }
+        },
+        "open_point": {
+          "target_entity": "switch",
+          "field_mappings": {
+            "code": ["assetid", "globalid", "GlobalID"],
+            "name": ["previous_name", "subnetworkname"],
+            "from_bus": ["connect_from_name", "previous_id", "assetid"],
+            "to_bus": ["connect_to_name", "previous_name"]
+          },
+          "defaults": {
+            "switch_type": "tie_switch",
+            "is_normally_open": true,
+            "current_status": "open",
+            "breaking_capacity_ka": 12.5,
+            "provenance": "measured",
+            "confidence_score": 0.90
+          }
+        },
+        "ring_main_unit": {
+          "target_entity": "switch",
+          "field_mappings": {
+            "code": ["asset_id", "global_id", "name"],
+            "name": ["name", "samagra_name"],
+            "from_bus": ["connect_from_name", "connect_from_ref"],
+            "to_bus": ["connect_to_name", "connect_to_ref"]
+          },
+          "defaults": {
+            "switch_type": "rmu",
+            "is_normally_open": false,
+            "current_status": "closed",
+            "breaking_capacity_ka": 16.0,
+            "provenance": "measured",
+            "confidence_score": 0.95
+          }
+        }
+      }
+    },
+    "geojson": {
+      "entities": {
+        "substation": {
+          "code": ["code", "id", "substation_code"],
+          "name": ["name", "substation_name"],
+          "nominal_kv": ["nominal_kv", "voltage_kv"],
+          "ptr_capacity_mva": ["ptr_capacity_mva", "capacity_mva"]
+        },
+        "feeder": {
+          "code": ["code", "id", "feeder_code"],
+          "name": ["name", "feeder_name"],
+          "voltage_kv": ["voltage_kv", "nominal_kv"],
+          "trunk_conductor_type": ["trunk_conductor_type", "conductor"]
+        },
+        "bus": {
+          "code": ["code", "id", "bus_code", "pole_code"],
+          "name": ["name", "bus_name"],
+          "voltage_level_kv": ["voltage_level_kv", "voltage_kv"],
+          "bus_type": ["bus_type", "type"]
+        },
+        "line": {
+          "code": ["code", "id", "line_code"],
+          "from_bus_code": ["from_bus_code", "from_bus", "from"],
+          "to_bus_code": ["to_bus_code", "to_bus", "to"],
+          "conductor_type": ["conductor_type", "conductor"],
+          "length_km": ["length_km", "length"]
+        },
+        "distribution_transformer": {
+          "code": ["code", "id", "dtr_code"],
+          "name": ["name", "dtr_name"],
+          "bus_code": ["bus_code", "pole_code", "bus"],
+          "rated_kva": ["rated_kva", "capacity_kva", "kva"],
+          "phase_count": ["phase_count", "phases"]
+        },
+        "switch": {
+          "code": ["code", "id", "switch_code"],
+          "from_bus_code": ["from_bus_code", "from_bus", "from"],
+          "to_bus_code": ["to_bus_code", "to_bus", "to"],
+          "switch_type": ["switch_type", "type"],
+          "is_normally_open": ["is_normally_open", "normally_open"],
+          "current_status": ["current_status", "status"]
+        },
+        "consumer": {
+          "service_number": ["service_number", "consumer_id", "id"],
+          "dtr_code": ["dtr_code", "dtr_id", "transformer_code"],
+          "consumer_category": ["consumer_category", "category", "tariff"],
+          "sanctioned_load_kw": ["sanctioned_load_kw", "load_kw", "kw"],
+          "phase": ["phase", "phase_count"]
+        }
+      }
+    },
+    "csv": {
+      "required_columns": {
+        "buses": ["code", "voltage_level_kv"],
+        "lines": ["code", "from_bus_code", "to_bus_code"],
+        "distribution_transformers": ["code", "bus_code", "rated_kva"],
+        "switches": ["code", "from_bus_code", "to_bus_code", "switch_type"],
+        "consumers": ["service_number", "dtr_code", "sanctioned_load_kw"]
+      }
+    }
+  }
+}

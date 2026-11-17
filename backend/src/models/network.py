@@ -11,13 +11,17 @@ class Organisation(CoreBaseModel):
     name = Column(String(128), nullable=False)
     description = Column(String(256), nullable=True)
 
-    substations = relationship("Substation", back_populates="organisation", cascade="all, delete-orphan")
+    substations = relationship(
+        "Substation", back_populates="organisation", cascade="all, delete-orphan"
+    )
 
 
 class Substation(CoreBaseModel, ProvenanceMixin):
     __tablename__ = "substations"
 
-    organisation_id = Column(Uuid(as_uuid=True), ForeignKey("organisations.id"), nullable=False, index=True)
+    organisation_id = Column(
+        Uuid(as_uuid=True), ForeignKey("organisations.id"), nullable=False, index=True
+    )
     code = Column(String(64), unique=True, nullable=False, index=True)
     name = Column(String(128), nullable=False)
     nominal_kv = Column(Float, default=33.0, nullable=False)
@@ -31,7 +35,9 @@ class Substation(CoreBaseModel, ProvenanceMixin):
 class Feeder(CoreBaseModel, ProvenanceMixin):
     __tablename__ = "feeders"
 
-    substation_id = Column(Uuid(as_uuid=True), ForeignKey("substations.id"), nullable=False, index=True)
+    substation_id = Column(
+        Uuid(as_uuid=True), ForeignKey("substations.id"), nullable=False, index=True
+    )
     code = Column(String(64), unique=True, nullable=False, index=True)
     name = Column(String(128), nullable=False)
     voltage_kv = Column(Float, default=11.0, nullable=False)
@@ -55,7 +61,9 @@ class Bus(CoreBaseModel, ProvenanceMixin):
     geom = Column(GeometryPointType(), nullable=True)
 
     feeder = relationship("Feeder", back_populates="buses")
-    dtrs = relationship("DistributionTransformer", back_populates="bus", cascade="all, delete-orphan")
+    dtrs = relationship(
+        "DistributionTransformer", back_populates="bus", cascade="all, delete-orphan"
+    )
 
 
 class Line(CoreBaseModel, ProvenanceMixin):
@@ -102,10 +110,14 @@ class Switch(CoreBaseModel, ProvenanceMixin):
     from_bus_id = Column(Uuid(as_uuid=True), ForeignKey("buses.id"), nullable=False, index=True)
     to_bus_id = Column(Uuid(as_uuid=True), ForeignKey("buses.id"), nullable=False, index=True)
     code = Column(String(64), unique=True, nullable=False, index=True)
-    switch_type = Column(String(32), default="sectionalizer", nullable=False)  # breaker, sectionalizer, rmu, ab_switch, tie_switch
+    switch_type = Column(
+        String(32), default="sectionalizer", nullable=False
+    )  # breaker, sectionalizer, rmu, ab_switch, tie_switch
     is_normally_open = Column(Boolean, default=False, nullable=False)
     current_status = Column(String(16), default="closed", nullable=False)  # closed, open
-    is_motorized = Column(Boolean, default=False, nullable=False)  # True = remote operable, False = manual field crew
+    is_motorized = Column(
+        Boolean, default=False, nullable=False
+    )  # True = remote operable, False = manual field crew
     breaking_capacity_ka = Column(Float, default=12.5, nullable=False)
     geom = Column(GeometryPointType(), nullable=True)
 
@@ -116,9 +128,13 @@ class Switch(CoreBaseModel, ProvenanceMixin):
 class Consumer(CoreBaseModel, ProvenanceMixin):
     __tablename__ = "consumers"
 
-    dtr_id = Column(Uuid(as_uuid=True), ForeignKey("distribution_transformers.id"), nullable=False, index=True)
+    dtr_id = Column(
+        Uuid(as_uuid=True), ForeignKey("distribution_transformers.id"), nullable=False, index=True
+    )
     service_number = Column(String(64), unique=True, nullable=False, index=True)
-    consumer_category = Column(String(32), default="domestic", nullable=False)  # domestic, commercial, industrial, agricultural, streetlight
+    consumer_category = Column(
+        String(32), default="domestic", nullable=False
+    )  # domestic, commercial, industrial, agricultural, streetlight
     sanctioned_load_kw = Column(Float, default=2.0, nullable=False)
     phase = Column(String(8), default="3ph", nullable=False)
     geom = Column(GeometryPointType(), nullable=True)
@@ -131,6 +147,7 @@ class Connection(CoreBaseModel, ProvenanceMixin):
     Explicit terminal-to-terminal connectivity table.
     Enforces Principle A4-4: Geometry is stored separately from topology.
     """
+
     __tablename__ = "connections"
 
     from_element_type = Column(String(32), nullable=False)  # bus, line, dtr, switch

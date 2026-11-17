@@ -9,12 +9,19 @@ class SwitchingPlan(CoreBaseModel, ProvenanceMixin):
     Candidate switching plan produced by MILP reconfiguration or FLISR,
     post-validated via AC power flow and categorized per A5 taxonomy.
     """
+
     __tablename__ = "switching_plans"
 
-    topology_version_id = Column(Uuid(as_uuid=True), ForeignKey("topology_versions.id"), nullable=False, index=True)
-    plan_type = Column(String(32), default="overload_relief", nullable=False)  # overload_relief, flisr
+    topology_version_id = Column(
+        Uuid(as_uuid=True), ForeignKey("topology_versions.id"), nullable=False, index=True
+    )
+    plan_type = Column(
+        String(32), default="overload_relief", nullable=False
+    )  # overload_relief, flisr
     candidate_rank = Column(Integer, default=1, nullable=False)
-    approval_status = Column(String(48), default=A5ApprovalStatusEnum.INSUFFICIENT_DATA.value, nullable=False)
+    approval_status = Column(
+        String(48), default=A5ApprovalStatusEnum.INSUFFICIENT_DATA.value, nullable=False
+    )
     ac_power_flow_converged = Column(Boolean, default=False, nullable=False)
     losses_before_kw = Column(Float, nullable=False)
     losses_after_kw = Column(Float, nullable=False)
@@ -33,9 +40,12 @@ class SwitchingStep(CoreBaseModel):
     Individual sequenced switching step.
     Enforces break-before-make sequencing to eliminate transient parallel loops.
     """
+
     __tablename__ = "switching_steps"
 
-    plan_id = Column(Uuid(as_uuid=True), ForeignKey("switching_plans.id"), nullable=False, index=True)
+    plan_id = Column(
+        Uuid(as_uuid=True), ForeignKey("switching_plans.id"), nullable=False, index=True
+    )
     step_order = Column(Integer, nullable=False)
     switch_id = Column(Uuid(as_uuid=True), ForeignKey("switches.id"), nullable=False, index=True)
     action = Column(String(16), nullable=False)  # open, close
@@ -51,10 +61,15 @@ class CapexRecommendation(CoreBaseModel, ProvenanceMixin):
     """
     CAPEX recommendations: Feeder bifurcation, DTR augmentation/siting, and reconductoring.
     """
+
     __tablename__ = "capex_recommendations"
 
-    topology_version_id = Column(Uuid(as_uuid=True), ForeignKey("topology_versions.id"), nullable=False, index=True)
-    intervention_type = Column(String(32), nullable=False)  # bifurcation, dtr_augmentation, dtr_siting, reconductoring
+    topology_version_id = Column(
+        Uuid(as_uuid=True), ForeignKey("topology_versions.id"), nullable=False, index=True
+    )
+    intervention_type = Column(
+        String(32), nullable=False
+    )  # bifurcation, dtr_augmentation, dtr_siting, reconductoring
     target_asset_id = Column(Uuid(as_uuid=True), nullable=False, index=True)
     target_asset_code = Column(String(64), nullable=False)
     description = Column(String(256), nullable=False)

@@ -17,7 +17,9 @@ from backend.src.models.base import A5ApprovalStatusEnum, ProvenanceEnum
 
 
 def test_create_organisation_and_substation(db_session: Session):
-    org = Organisation(code="TSSPDCL", name="Telangana State Southern Power Distribution Co Ltd")
+    org = Organisation(
+        code="TSSPDCL", name="Telangana State Southern Power Distribution Co Ltd"
+    )
     db_session.add(org)
     db_session.flush()
 
@@ -106,11 +108,15 @@ def test_dtr_and_consumer_relationship(db_session: Session):
     db_session.add(org)
     db_session.flush()
 
-    sub = Substation(organisation_id=org.id, code="SS_DTR", name="SS DTR", nominal_kv=33.0)
+    sub = Substation(
+        organisation_id=org.id, code="SS_DTR", name="SS DTR", nominal_kv=33.0
+    )
     db_session.add(sub)
     db_session.flush()
 
-    feeder = Feeder(substation_id=sub.id, code="FDR_DTR", name="Feeder DTR", voltage_kv=11.0)
+    feeder = Feeder(
+        substation_id=sub.id, code="FDR_DTR", name="Feeder DTR", voltage_kv=11.0
+    )
     db_session.add(feeder)
     db_session.flush()
 

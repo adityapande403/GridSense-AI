@@ -15,6 +15,10 @@ build/
 *.db
 *.sqlite3
 
+# Archives & Raw Zips
+*.zip
+*.tar.gz
+
 # Testing & Linting
 .pytest_cache/
 .ruff_cache/

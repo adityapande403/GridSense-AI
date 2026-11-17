@@ -23,7 +23,9 @@ class GenerateSyntheticRequest(BaseModel):
         default="normal",
         description="normal | dtr_overload | feeder_overload | undervoltage | fault_section",
     )
-    persist_to_db: bool = Field(default=False, description="Persist the generated network into relational database")
+    persist_to_db: bool = Field(
+        default=False, description="Persist the generated network into relational database"
+    )
     version_tag: Optional[str] = Field(default=None, description="Optional custom version tag")
 
 
@@ -119,16 +121,18 @@ def list_feeders(db: Session = Depends(get_db)):
         )
         line_count = db.query(Line).filter(Line.feeder_id == f.id).count()
 
-        results.append({
-            "id": str(f.id),
-            "code": f.code,
-            "name": f.name,
-            "voltage_kv": f.voltage_kv,
-            "trunk_conductor": f.trunk_conductor_type,
-            "dtr_count": dtr_count,
-            "line_count": line_count,
-            "provenance": f.provenance,
-        })
+        results.append(
+            {
+                "id": str(f.id),
+                "code": f.code,
+                "name": f.name,
+                "voltage_kv": f.voltage_kv,
+                "trunk_conductor": f.trunk_conductor_type,
+                "dtr_count": dtr_count,
+                "line_count": line_count,
+                "provenance": f.provenance,
+            }
+        )
     return results
 
 
