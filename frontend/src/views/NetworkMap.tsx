@@ -129,9 +129,11 @@ export const NetworkMap: React.FC = () => {
               className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
             >
               <option value="all">All Available Network Feeders</option>
-              <option value="F_TEL_01">Feeder 1 (F_TEL_01 - Mixed Urban/Agri)</option>
-              <option value="F_TEL_02">Feeder 2 (F_TEL_02 - Interconnected Alternate)</option>
-              <option value="2011951">Puthiya Kadavu Feeder (2011951 - KSEB Ingested GIS)</option>
+              {data?.feeders.map((f) => (
+                <option key={f.code} value={f.code}>
+                  {f.name} ({f.code})
+                </option>
+              ))}
             </select>
           </div>
 

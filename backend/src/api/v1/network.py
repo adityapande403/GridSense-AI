@@ -255,20 +255,28 @@ def get_network_geojson(
         to_b = bus_map.get(line.to_bus_id)
 
         line_coords = []
-        if line.geom and hasattr(line.geom, "coords"):
-            line_coords = [[float(c[0]), float(c[1])] for c in line.geom.coords]
+        if line.geom:
+            geom_type = getattr(line.geom, "geom_type", "")
+            if geom_type == "LineString":
+                line_coords = [[float(c[0]), float(c[1])] for c in line.geom.coords]
+            elif geom_type == "MultiLineString":
+                line_coords = []
+                for subgeom in line.geom.geoms:
+                    line_coords.extend([[float(c[0]), float(c[1])] for c in subgeom.coords])
             for c in line_coords:
                 all_lons.append(c[0])
                 all_lats.append(c[1])
-        elif from_b and to_b and from_b.geom and to_b.geom:
-            line_coords = [
-                [float(from_b.geom.x), float(from_b.geom.y)],
-                [float(to_b.geom.x), float(to_b.geom.y)],
-            ]
-            track_point(from_b.geom)
-            track_point(to_b.geom)
-        else:
-            line_coords = [[78.48, 17.38], [78.49, 17.39]]
+
+        if not line_coords:
+            if from_b and to_b and from_b.geom and to_b.geom:
+                line_coords = [
+                    [float(from_b.geom.x), float(from_b.geom.y)],
+                    [float(to_b.geom.x), float(to_b.geom.y)],
+                ]
+                track_point(from_b.geom)
+                track_point(to_b.geom)
+            else:
+                line_coords = [[78.48, 17.38], [78.49, 17.39]]
 
         # Simulated loading percentage
         loading_pct = 45.0
