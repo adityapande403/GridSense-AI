@@ -328,8 +328,12 @@ export const NetworkMap: React.FC = () => {
                 data?.lines.features.map((lineFeat) => {
                   const coords = lineFeat.geometry.coordinates;
                   if (!coords || coords.length < 2) return null;
-                  const p1 = getCoordinates(coords[0]);
-                  const p2 = getCoordinates(coords[coords.length - 1]);
+                  const pointsString = coords
+                    .map((c: [number, number]) => {
+                      const pt = getCoordinates(c);
+                      return `${pt.x},${pt.y}`;
+                    })
+                    .join(' ');
 
                   const isSelected = selectedAsset?.code === lineFeat.properties.code;
                   const strokeColor = isSelected
@@ -340,14 +344,14 @@ export const NetworkMap: React.FC = () => {
 
                   return (
                     <g key={lineFeat.properties.id}>
-                      <line
-                        x1={p1.x}
-                        y1={p1.y}
-                        x2={p2.x}
-                        y2={p2.y}
+                      <polyline
+                        points={pointsString}
+                        fill="none"
                         stroke={strokeColor}
                         strokeWidth={isSelected ? 4 : 2.5}
                         strokeDasharray={lineFeat.properties.is_operational ? 'none' : '4 3'}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                         className="hover:stroke-cyan-300 cursor-pointer transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
