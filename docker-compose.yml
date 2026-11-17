@@ -1,0 +1,51 @@
+services:
+  gridsense-db:
+    image: postgis/postgis:16-3.4
+    container_name: gridsense-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gridsense
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - gridsense_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gridsense"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gridsense-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: gridsense-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@gridsense-db:5432/gridsense
+      ENVIRONMENT: development
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      gridsense-db:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+      - ./backend:/app/backend
+
+  gridsense-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: gridsense-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - gridsense-backend
+
+volumes:
+  gridsense_pgdata:

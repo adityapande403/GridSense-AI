@@ -1,0 +1,26 @@
+{
+  "iec_60076_7": {
+    "oil_time_constant_minutes": 150.0,
+    "winding_time_constant_minutes": 6.0,
+    "oil_exponent_x": 0.8,
+    "winding_exponent_y": 1.3,
+    "rated_top_oil_rise_kelvin": 55.0,
+    "rated_hot_spot_rise_kelvin": 78.0,
+    "rated_hot_spot_gradient_kelvin": 23.0,
+    "reference_ambient_temp_c": 30.0,
+    "reference_hot_spot_temp_c": 98.0,
+    "standard_notes": "IEC 60076-7 Loading guide for oil-immersed power transformers (ONAN cooling)"
+  },
+  "health_index_weights": {
+    "hours_over_100pct_weight": 0.35,
+    "peak_hot_spot_temp_weight": 0.25,
+    "cumulative_loss_of_life_weight": 0.25,
+    "ambient_temperature_stress_weight": 0.15,
+    "critical_hot_spot_threshold_c": 120.0,
+    "emergency_hot_spot_threshold_c": 140.0
+  },
+  "provenance": {
+    "default_flag": "assumed",
+    "disclaimer": "Thermal stress estimates are calculated via IEC 60076-7 dynamic models; not directly measured with physical oil/winding sensors"
+  }
+}

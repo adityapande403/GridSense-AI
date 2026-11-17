@@ -1,0 +1,45 @@
+{
+  "valuation": {
+    "technical_loss_cost_inr_per_kwh": 5.50,
+    "loss_cost_notes": "TSSPDCL Average Cost of Supply (ACoS) baseline; sensitivity bounds ₹3.50 to ₹7.50/kWh",
+    "discount_rate_annual_pct": 10.0,
+    "project_lifetime_years": 15,
+    "annual_om_cost_pct_of_capex": 2.5
+  },
+  "asset_costs_inr": {
+    "distribution_transformers": {
+      "16_kva": 65000.0,
+      "25_kva": 95000.0,
+      "63_kva": 160000.0,
+      "100_kva": 220000.0,
+      "160_kva": 310000.0,
+      "250_kva": 450000.0,
+      "315_kva": 560000.0,
+      "500_kva": 780000.0
+    },
+    "substation_infrastructure": {
+      "new_11kv_terminal_bay": 1500000.0,
+      "33_11kv_ptr_5mva": 4500000.0,
+      "33_11kv_ptr_8mva": 6500000.0
+    },
+    "switching_equipment": {
+      "motorized_rmu_unit": 400000.0,
+      "manual_ab_switch_11kv": 45000.0,
+      "auto_recloser_11kv": 750000.0,
+      "sectionalizer_11kv": 350000.0,
+      "drop_out_fuse_set": 12000.0
+    },
+    "line_construction": {
+      "overhead_11kv_per_km_average": 650000.0,
+      "reconductoring_labor_per_km": 40000.0
+    }
+  },
+  "reliability_penalties": {
+    "cost_of_unserved_energy_inr_per_kwh": 25.0,
+    "interruption_cost_per_cmi_inr": 0.50
+  },
+  "provenance": {
+    "default_flag": "assumed",
+    "source_reference": "TSSPDCL Standard Schedule of Rates (SoR) 2024-25 / RDSS Guidelines"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "system": {
+    "grid_frequency_hz": 50.0,
+    "nominal_voltages_kv": [33.0, 11.0, 0.415, 0.24],
+    "voltage_limits": {
+      "nominal_11kv": {
+        "v_min_pu": 0.94,
+        "v_max_pu": 1.06,
+        "v_warn_low_pu": 0.95,
+        "v_warn_high_pu": 1.05,
+        "statutory_band_pct": 6.0,
+        "notes": "Default ±6.0% statutory regulation band per TGERC Distribution Code; verify against current tariff order"
+      },
+      "nominal_lt": {
+        "v_min_pu": 0.94,
+        "v_max_pu": 1.06,
+        "statutory_band_pct": 6.0
+      }
+    },
+    "power_factor_statutory_min": 0.90,
+    "standard_dtr_ratings_kva": [16, 25, 63, 100, 160, 250, 315, 500],
+    "standard_substation_ptr_mva": [3.15, 5.0, 8.0, 10.0],
+    "loading_thresholds": {
+      "normal_max_pct": 80.0,
+      "warning_max_pct": 100.0,
+      "overload_max_pct": 120.0,
+      "emergency_min_pct": 120.0
+    }
+  },
+  "provenance": {
+    "default_flag": "assumed",
+    "authority": "CEA Technical Standards / TGERC"
+  }
+}
