@@ -1,10 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   ZoomIn,
   ZoomOut,
   Maximize2,
   RefreshCw,
   AlertTriangle,
+  Layers,
+  Map as MapIcon,
   CheckCircle2,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
@@ -32,12 +36,14 @@ interface NetworkGeoJSONResponse {
   center: [number, number];
 }
 
+type BaseMapType = 'dark' | 'osm' | 'satellite';
+
 export const NetworkMap: React.FC = () => {
   const [data, setData] = useState<NetworkGeoJSONResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFeeder, setSelectedFeeder] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'geo' | 'sld'>('geo');
+  const [selectedFeeder, setSelectedFeeder] = useState<string>('2011951');
+  const [baseMap, setBaseMap] = useState<BaseMapType>('dark');
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
 
   // Layer visibility toggles
@@ -47,14 +53,93 @@ export const NetworkMap: React.FC = () => {
   const [showSwitches, setShowSwitches] = useState<boolean>(true);
   const [showConsumers, setShowConsumers] = useState<boolean>(false);
 
-  // Zoom and pan state
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const layerGroupsRef = useRef<{
+    substations: L.LayerGroup;
+    lines: L.LayerGroup;
+    dtrs: L.LayerGroup;
+    switches: L.LayerGroup;
+    consumers: L.LayerGroup;
+  } | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // 1. Initialize Leaflet Map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
 
+    // Default center at Puthiya Kadavu (Kozhikode, Kerala)
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: false,
+      minZoom: 3,
+      maxZoom: 20,
+    }).setView([11.2678, 75.7671], 16);
+
+    // Initial tile layer (CartoDB Dark Matter)
+    const tileLayer = L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20,
+      }
+    ).addTo(map);
+
+    tileLayerRef.current = tileLayer;
+
+    // Feature LayerGroups
+    const substationsGroup = L.layerGroup().addTo(map);
+    const linesGroup = L.layerGroup().addTo(map);
+    const dtrsGroup = L.layerGroup().addTo(map);
+    const switchesGroup = L.layerGroup().addTo(map);
+    const consumersGroup = L.layerGroup().addTo(map);
+
+    layerGroupsRef.current = {
+      substations: substationsGroup,
+      lines: linesGroup,
+      dtrs: dtrsGroup,
+      switches: switchesGroup,
+      consumers: consumersGroup,
+    };
+
+    mapInstanceRef.current = map;
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // 2. Handle Base Map Tile Layer Switch
+  useEffect(() => {
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+
+    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+
+    let url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    let attr = '&copy; OpenStreetMap contributors &copy; CARTO';
+    let sub = 'abcd';
+
+    if (baseMap === 'osm') {
+      url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      attr = '&copy; OpenStreetMap contributors';
+      sub = 'abc';
+    } else if (baseMap === 'satellite') {
+      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      attr = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
+      sub = 'abc';
+    }
+
+    const newTileLayer = L.tileLayer(url, {
+      attribution: attr,
+      subdomains: sub,
+      maxZoom: 20,
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newTileLayer;
+  }, [baseMap]);
+
+  // 3. Fetch Network Data from Backend
   const fetchNetworkData = (feederCode?: string) => {
     setLoading(true);
     setError(null);
@@ -64,7 +149,7 @@ export const NetworkMap: React.FC = () => {
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         return res.json();
       })
-      .then((resData) => {
+      .then((resData: NetworkGeoJSONResponse) => {
         setData(resData);
         setLoading(false);
       })
@@ -79,41 +164,301 @@ export const NetworkMap: React.FC = () => {
     fetchNetworkData(selectedFeeder);
   }, [selectedFeeder]);
 
-  // Coordinate normalizer for SVG canvas
-  const getCoordinates = (coords: [number, number]) => {
-    if (!data || !data.bounds) return { x: 400, y: 300 };
-    const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
-    const width = 800;
-    const height = 550;
-    const padding = 60;
+  // 4. Render GeoJSON Assets onto Leaflet Layers
+  useEffect(() => {
+    if (!data || !layerGroupsRef.current || !mapInstanceRef.current) return;
 
-    const lonSpan = maxLon - minLon || 0.01;
-    const latSpan = maxLat - minLat || 0.01;
+    const { substations, lines, dtrs, switches, consumers } = layerGroupsRef.current;
 
-    const x = padding + ((coords[0] - minLon) / lonSpan) * (width - 2 * padding);
-    // Invert Y axis for map rendering (latitudes increase upwards)
-    const y = height - padding - ((coords[1] - minLat) / latSpan) * (height - 2 * padding);
+    // Clear existing features
+    substations.clearLayers();
+    lines.clearLayers();
+    dtrs.clearLayers();
+    switches.clearLayers();
+    consumers.clearLayers();
 
-    return { x, y };
-  };
+    // A. Render 11 kV HT Lines (MultiLineString & LineString)
+    if (showLines && data.lines?.features) {
+      data.lines.features.forEach((lineFeat) => {
+        const coords = lineFeat.geometry?.coordinates;
+        if (!coords || coords.length < 2) return;
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
+        // Leaflet expects [lat, lon], GeoJSON provides [lon, lat]
+        const latlngs = coords.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+        const isOperational = lineFeat.properties.is_operational !== false;
+        const isSelected = selectedAsset?.code === lineFeat.properties.code;
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
+        const polyline = L.polyline(latlngs, {
+          color: isSelected ? '#38bdf8' : (isOperational ? '#06b6d4' : '#64748b'),
+          weight: isSelected ? 5 : 3.5,
+          opacity: 0.9,
+          dashArray: isOperational ? undefined : '6, 6',
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+        // Hover tooltip
+        polyline.bindTooltip(
+          `
+          <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div style="font-weight: bold; color: #38bdf8;">${lineFeat.properties.name || lineFeat.properties.code}</div>
+            <div>Conductor: <b>${lineFeat.properties.conductor_type || 'ACSR'}</b></div>
+            <div>Length: <b>${lineFeat.properties.length_km} km</b></div>
+            <div>Loading: <b>${lineFeat.properties.loading_pct}%</b></div>
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">From: ${lineFeat.properties.from_bus_code} &rarr; To: ${lineFeat.properties.to_bus_code}</div>
+          </div>
+          `,
+          { sticky: true, opacity: 1 }
+        );
 
-  const resetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+        polyline.on('click', () => {
+          setSelectedAsset({
+            id: lineFeat.properties.id,
+            code: lineFeat.properties.code,
+            name: lineFeat.properties.name,
+            entity_type: 'line',
+            provenance: lineFeat.properties.provenance,
+            confidence_score: lineFeat.properties.confidence_score,
+            properties: lineFeat.properties,
+          });
+        });
+
+        lines.addLayer(polyline);
+      });
+    }
+
+    // B. Render Substations (33/11 kV)
+    if (showSubstations && data.substations?.features) {
+      data.substations.features.forEach((subFeat) => {
+        const coords = subFeat.geometry?.coordinates;
+        if (!coords) return;
+        const lat = coords[1];
+        const lon = coords[0];
+
+        const subIcon = L.divIcon({
+          className: 'custom-sub-icon',
+          html: `
+            <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer;">
+              <div style="width: 22px; height: 22px; transform: rotate(45deg); background: #581c87; border: 2.5px solid #c084fc; box-shadow: 0 0 12px #a855f7; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 6px; height: 6px; background: #e9d5ff; border-radius: 50%;"></div>
+              </div>
+            </div>
+          `,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+        });
+
+        const marker = L.marker([lat, lon], { icon: subIcon });
+
+        marker.bindTooltip(
+          `
+          <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #7e22ce; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div style="font-weight: bold; color: #c084fc;">${subFeat.properties.name || subFeat.properties.code}</div>
+            <div>Voltage: <b>${subFeat.properties.nominal_kv} kV</b></div>
+            <div>PTR Capacity: <b>${subFeat.properties.ptr_capacity_mva} MVA</b></div>
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">Type: 33/11 kV Primary Substation</div>
+          </div>
+          `,
+          { direction: 'top', offset: [0, -14], opacity: 1 }
+        );
+
+        marker.on('click', () => {
+          setSelectedAsset({
+            id: subFeat.properties.id,
+            code: subFeat.properties.code,
+            name: subFeat.properties.name,
+            entity_type: 'substation',
+            provenance: subFeat.properties.provenance,
+            confidence_score: subFeat.properties.confidence_score,
+            properties: subFeat.properties,
+          });
+        });
+
+        substations.addLayer(marker);
+      });
+    }
+
+    // C. Render Switches & Tie Points
+    if (showSwitches && data.switches?.features) {
+      data.switches.features.forEach((swFeat) => {
+        const coords = swFeat.geometry?.coordinates;
+        if (!coords) return;
+        const lat = coords[1];
+        const lon = coords[0];
+        const isNormallyOpen = swFeat.properties.is_normally_open;
+        const isClosed = swFeat.properties.current_status === 'closed';
+
+        const swIcon = L.divIcon({
+          className: 'custom-sw-icon',
+          html: isNormallyOpen
+            ? `
+              <div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; cursor: pointer;">
+                <div style="width: 18px; height: 18px; border-radius: 50%; border: 2.5px dashed #f97316; background: rgba(69, 26, 3, 0.9); box-shadow: 0 0 10px #ea580c; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 4px; height: 4px; border-radius: 50%; background: #fdba74;"></div>
+                </div>
+              </div>
+            `
+            : `
+              <div style="display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; cursor: pointer;">
+                <div style="width: 12px; height: 12px; border-radius: 2px; background: ${isClosed ? '#064e3b' : '#881337'}; border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'}; box-shadow: 0 0 8px ${isClosed ? '#10b981' : '#f43f5e'};"></div>
+              </div>
+            `,
+          iconSize: isNormallyOpen ? [22, 22] : [16, 16],
+          iconAnchor: isNormallyOpen ? [11, 11] : [8, 8],
+        });
+
+        const marker = L.marker([lat, lon], { icon: swIcon });
+
+        marker.bindTooltip(
+          `
+          <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div style="font-weight: bold; color: ${isNormallyOpen ? '#fb923c' : (isClosed ? '#34d399' : '#f87171')};">
+              ${isNormallyOpen ? 'OPEN TIE SWITCH' : `SWITCH (${swFeat.properties.current_status.toUpperCase()})`}
+            </div>
+            <div>Code: <b>${swFeat.properties.code}</b></div>
+            <div>Type: <b>${swFeat.properties.switch_type}</b></div>
+            <div>Motorized: <b>${swFeat.properties.is_motorized ? 'Yes (SCADA Ready)' : 'Manual Field Crew'}</b></div>
+          </div>
+          `,
+          { direction: 'top', offset: [0, -8], opacity: 1 }
+        );
+
+        marker.on('click', () => {
+          setSelectedAsset({
+            id: swFeat.properties.id,
+            code: swFeat.properties.code,
+            name: swFeat.properties.name,
+            entity_type: 'switch',
+            provenance: swFeat.properties.provenance,
+            confidence_score: swFeat.properties.confidence_score,
+            properties: swFeat.properties,
+          });
+        });
+
+        switches.addLayer(marker);
+      });
+    }
+
+    // D. Render Distribution Transformers (DTRs)
+    if (showDTRs && data.transformers?.features) {
+      data.transformers.features.forEach((dtrFeat) => {
+        const coords = dtrFeat.geometry?.coordinates;
+        if (!coords) return;
+        const lat = coords[1];
+        const lon = coords[0];
+
+        const loadingPct = dtrFeat.properties.loading_pct || 72.0;
+        const isOverloaded = loadingPct > 100.0;
+        const isWarning = loadingPct > 80.0 && !isOverloaded;
+        const color = isOverloaded ? '#ef4444' : (isWarning ? '#f59e0b' : '#10b981');
+
+        const dtrIcon = L.divIcon({
+          className: 'custom-dtr-icon',
+          html: `
+            <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; cursor: pointer;">
+              ${
+                isOverloaded
+                  ? '<div style="position: absolute; width: 30px; height: 30px; border-radius: 50%; background: rgba(239,68,68,0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>'
+                  : ''
+              }
+              <div style="width: 15px; height: 15px; border-radius: 50%; background: ${color}; border: 2.5px solid #ffffff; box-shadow: 0 0 10px ${color}; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 3px; height: 3px; border-radius: 50%; background: #ffffff;"></div>
+              </div>
+            </div>
+          `,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        });
+
+        const marker = L.marker([lat, lon], { icon: dtrIcon });
+
+        marker.bindTooltip(
+          `
+          <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div style="font-weight: bold; color: ${color};">${dtrFeat.properties.name || dtrFeat.properties.code}</div>
+            <div>Rating: <b>${dtrFeat.properties.rated_kva} kVA</b></div>
+            <div>Loading: <b style="color: ${color};">${loadingPct}%</b> (${dtrFeat.properties.status})</div>
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">Provenance: ${dtrFeat.properties.provenance}</div>
+          </div>
+          `,
+          { direction: 'top', offset: [0, -12], opacity: 1 }
+        );
+
+        marker.on('click', () => {
+          setSelectedAsset({
+            id: dtrFeat.properties.id,
+            code: dtrFeat.properties.code,
+            name: dtrFeat.properties.name,
+            entity_type: 'distribution_transformer',
+            provenance: dtrFeat.properties.provenance,
+            confidence_score: dtrFeat.properties.confidence_score,
+            properties: dtrFeat.properties,
+          });
+        });
+
+        dtrs.addLayer(marker);
+      });
+    }
+
+    // E. Render Consumers (Optional)
+    if (showConsumers && data.consumers?.features) {
+      data.consumers.features.forEach((cFeat) => {
+        const coords = cFeat.geometry?.coordinates;
+        if (!coords) return;
+        const lat = coords[1];
+        const lon = coords[0];
+
+        const circle = L.circleMarker([lat, lon], {
+          radius: 3,
+          fillColor: '#60a5fa',
+          color: '#1d4ed8',
+          weight: 1,
+          opacity: 0.8,
+          fillOpacity: 0.8,
+        });
+
+        circle.bindTooltip(`Consumer: ${cFeat.properties.service_number} (${cFeat.properties.consumer_category})`);
+        circle.on('click', () => {
+          setSelectedAsset({
+            id: cFeat.properties.id,
+            code: cFeat.properties.service_number,
+            entity_type: 'consumer',
+            provenance: cFeat.properties.provenance,
+            properties: cFeat.properties,
+          });
+        });
+
+        consumers.addLayer(circle);
+      });
+    }
+
+    // F. Smooth Fit Bounds to Active Feeder
+    if (data.bounds && data.bounds.length === 2) {
+      const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+      mapInstanceRef.current.fitBounds(
+        [
+          [minLat, minLon],
+          [maxLat, maxLon],
+        ],
+        { padding: [50, 50], maxZoom: 17, animate: true }
+      );
+    }
+  }, [data, showSubstations, showLines, showDTRs, showSwitches, showConsumers, selectedAsset]);
+
+  // Zoom controls
+  const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
+  const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
+  const handleFitBounds = () => {
+    if (data?.bounds && mapInstanceRef.current) {
+      const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+      mapInstanceRef.current.fitBounds(
+        [
+          [minLat, minLon],
+          [maxLat, maxLon],
+        ],
+        { padding: [50, 50], maxZoom: 17, animate: true }
+      );
+    }
   };
 
   return (
@@ -137,23 +482,34 @@ export const NetworkMap: React.FC = () => {
             </select>
           </div>
 
-          {/* View Mode Toggle */}
+          {/* Base Map Style Selector */}
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs font-medium">
             <button
-              onClick={() => setViewMode('geo')}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                viewMode === 'geo' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              onClick={() => setBaseMap('dark')}
+              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'dark' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Geographic SLD Map
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Carto Dark</span>
             </button>
             <button
-              onClick={() => setViewMode('sld')}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                viewMode === 'sld' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              onClick={() => setBaseMap('osm')}
+              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'osm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Topological Tree View
+              <Layers className="w-3.5 h-3.5" />
+              <span>Streets (OSM)</span>
+            </button>
+            <button
+              onClick={() => setBaseMap('satellite')}
+              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'satellite' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Satellite</span>
             </button>
           </div>
         </div>
@@ -193,7 +549,7 @@ export const NetworkMap: React.FC = () => {
       {/* Main Map Canvas Area */}
       <div className="flex-1 relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex">
         {/* Layer Controls Palette (Floating Top Left) */}
-        <div className="absolute top-4 left-4 z-20 bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 shadow-xl backdrop-blur-md space-y-2 text-xs">
+        <div className="absolute top-4 left-4 z-[500] bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 shadow-xl backdrop-blur-md space-y-2 text-xs">
           <span className="font-mono text-slate-400 uppercase tracking-wider block mb-1">Layer Visibility</span>
           <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
             <input
@@ -243,302 +599,56 @@ export const NetworkMap: React.FC = () => {
               className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
             />
             <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-            <span>Consumers ({data?.consumers.features.length || 0})</span>
+            <span>Consumers ({data?.consumers?.features?.length || 0})</span>
           </label>
         </div>
 
         {/* Canvas Navigation Tools (Floating Bottom Left) */}
-        <div className="absolute bottom-4 left-4 z-20 flex items-center space-x-1.5 bg-slate-900/90 border border-slate-800/80 rounded-xl p-1 shadow-xl backdrop-blur-md">
+        <div className="absolute bottom-4 left-4 z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-800/80 rounded-xl p-1 shadow-xl backdrop-blur-md">
           <button
-            onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
+            onClick={handleZoomIn}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))}
+            onClick={handleZoomOut}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
-            onClick={resetView}
+            onClick={handleFitBounds}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Reset View"
+            title="Fit to Feeder Bounds"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
         </div>
 
         {/* Topological Integrity Pill (Floating Bottom Center) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-slate-900/90 border border-emerald-800/60 text-emerald-300 px-4 py-1.5 rounded-full shadow-xl backdrop-blur-md flex items-center space-x-2 text-xs font-mono">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/90 border border-emerald-800/60 text-emerald-300 px-4 py-1.5 rounded-full shadow-xl backdrop-blur-md flex items-center space-x-2 text-xs font-mono">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>TOPOLOGICAL CONSISTENCY: AC RADIAL &bull; NO ORPHAN BUSES &bull; TIE SWITCH OPEN</span>
         </div>
 
-        {/* SVG SLD Map Canvas */}
-        <div
-          ref={containerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          className="flex-1 w-full h-full cursor-grab active:cursor-grabbing select-none relative overflow-hidden"
-        >
-          {loading ? (
-            <div className="flex items-center justify-center h-full space-x-3 text-slate-400 text-sm">
+        {/* Interactive Leaflet Map Container */}
+        <div className="flex-1 w-full h-full relative">
+          {loading && (
+            <div className="absolute inset-0 z-[600] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center space-x-3 text-slate-400 text-sm">
               <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
-              <span>Rendering Distribution Digital Twin...</span>
+              <span>Rendering GIS Distribution Digital Twin...</span>
             </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-full space-x-3 text-rose-400 text-sm">
+          )}
+          {error && (
+            <div className="absolute inset-0 z-[600] bg-slate-950/80 flex items-center justify-center space-x-3 text-rose-400 text-sm">
               <AlertTriangle className="w-5 h-5" />
               <span>{error}</span>
             </div>
-          ) : (
-            <svg
-              className="w-full h-full"
-              style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: 'center center',
-                transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-              }}
-              viewBox="0 0 800 550"
-            >
-              {/* Dark Grid Background Lines */}
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.5" />
-                </pattern>
-                {/* Glow Filter for Overloaded Elements */}
-                <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="2" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-
-              {/* 1. Render HT Lines */}
-              {showLines &&
-                data?.lines.features.map((lineFeat) => {
-                  const coords = lineFeat.geometry.coordinates;
-                  if (!coords || coords.length < 2) return null;
-                  const pointsString = coords
-                    .map((c: [number, number]) => {
-                      const pt = getCoordinates(c);
-                      return `${pt.x},${pt.y}`;
-                    })
-                    .join(' ');
-
-                  const isSelected = selectedAsset?.code === lineFeat.properties.code;
-                  const strokeColor = isSelected
-                    ? '#38bdf8'
-                    : lineFeat.properties.is_operational
-                    ? '#06b6d4'
-                    : '#64748b';
-
-                  return (
-                    <g key={lineFeat.properties.id}>
-                      <polyline
-                        points={pointsString}
-                        fill="none"
-                        stroke={strokeColor}
-                        strokeWidth={isSelected ? 4 : 2.5}
-                        strokeDasharray={lineFeat.properties.is_operational ? 'none' : '4 3'}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="hover:stroke-cyan-300 cursor-pointer transition-all"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAsset({
-                            id: lineFeat.properties.id,
-                            code: lineFeat.properties.code,
-                            entity_type: 'line',
-                            provenance: lineFeat.properties.provenance,
-                            confidence_score: lineFeat.properties.confidence_score,
-                            properties: lineFeat.properties,
-                          });
-                        }}
-                      />
-                    </g>
-                  );
-                })}
-
-              {/* 2. Render Substations */}
-              {showSubstations &&
-                data?.substations.features.map((subFeat) => {
-                  const pt = getCoordinates(subFeat.geometry.coordinates);
-                  const isSelected = selectedAsset?.code === subFeat.properties.code;
-                  return (
-                    <g
-                      key={subFeat.properties.id}
-                      transform={`translate(${pt.x}, ${pt.y})`}
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAsset({
-                          id: subFeat.properties.id,
-                          code: subFeat.properties.code,
-                          name: subFeat.properties.name,
-                          entity_type: 'substation',
-                          provenance: subFeat.properties.provenance,
-                          confidence_score: subFeat.properties.confidence_score,
-                          properties: subFeat.properties,
-                        });
-                      }}
-                    >
-                      <polygon
-                        points="0,-14 14,0 0,14 -14,0"
-                        fill="#581c87"
-                        stroke={isSelected ? '#c084fc' : '#a855f7'}
-                        strokeWidth={isSelected ? 3 : 2}
-                      />
-                      <circle r="4" fill="#e9d5ff" />
-                      <text x="18" y="4" fill="#e9d5ff" fontSize="10" fontFamily="monospace" fontWeight="bold">
-                        {subFeat.properties.name || subFeat.properties.code}
-                      </text>
-                    </g>
-                  );
-                })}
-
-              {/* 3. Render Switches & Tie Points */}
-              {showSwitches &&
-                data?.switches.features.map((swFeat) => {
-                  const pt = getCoordinates(swFeat.geometry.coordinates);
-                  const isNormallyOpen = swFeat.properties.is_normally_open;
-                  const isClosed = swFeat.properties.current_status === 'closed';
-                  const isSelected = selectedAsset?.code === swFeat.properties.code;
-
-                  return (
-                    <g
-                      key={swFeat.properties.id}
-                      transform={`translate(${pt.x}, ${pt.y})`}
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAsset({
-                          id: swFeat.properties.id,
-                          code: swFeat.properties.code,
-                          name: swFeat.properties.name,
-                          entity_type: 'switch',
-                          provenance: swFeat.properties.provenance,
-                          confidence_score: swFeat.properties.confidence_score,
-                          properties: swFeat.properties,
-                        });
-                      }}
-                    >
-                      {isNormallyOpen ? (
-                        // Open Tie Switch (Dashed Orange Ring)
-                        <circle
-                          r="7"
-                          fill="#451a03"
-                          stroke={isSelected ? '#fed7aa' : '#f97316'}
-                          strokeWidth="2"
-                          strokeDasharray="3 2"
-                        />
-                      ) : (
-                        // Standard Sectionalizer / Breaker
-                        <rect
-                          x="-5"
-                          y="-5"
-                          width="10"
-                          height="10"
-                          fill={isClosed ? '#064e3b' : '#881337'}
-                          stroke={isClosed ? '#10b981' : '#f43f5e'}
-                          strokeWidth="1.5"
-                          rx="1"
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-
-              {/* 4. Render Distribution Transformers */}
-              {showDTRs &&
-                data?.transformers.features.map((dtrFeat) => {
-                  const pt = getCoordinates(dtrFeat.geometry.coordinates);
-                  const loadingPct = dtrFeat.properties.loading_pct || 70.0;
-                  const isOverloaded = loadingPct > 100.0;
-                  const isWarning = loadingPct > 80.0 && !isOverloaded;
-                  const isSelected = selectedAsset?.code === dtrFeat.properties.code;
-
-                  const color = isOverloaded ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
-
-                  return (
-                    <g
-                      key={dtrFeat.properties.id}
-                      transform={`translate(${pt.x}, ${pt.y})`}
-                      className="cursor-pointer group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAsset({
-                          id: dtrFeat.properties.id,
-                          code: dtrFeat.properties.code,
-                          name: dtrFeat.properties.name,
-                          entity_type: 'distribution_transformer',
-                          provenance: dtrFeat.properties.provenance,
-                          confidence_score: dtrFeat.properties.confidence_score,
-                          properties: dtrFeat.properties,
-                        });
-                      }}
-                    >
-                      {isOverloaded && (
-                        <circle r="12" fill="#ef4444" opacity="0.3" filter="url(#glow-red)" className="animate-ping" />
-                      )}
-                      <circle
-                        r="7"
-                        fill={color}
-                        stroke={isSelected ? '#ffffff' : '#0f172a'}
-                        strokeWidth={isSelected ? 2.5 : 1.5}
-                      />
-                      <circle r="2" fill="#ffffff" />
-                      <text
-                        x="10"
-                        y="3"
-                        fill={isOverloaded ? '#fca5a5' : '#cbd5e1'}
-                        fontSize="9"
-                        fontFamily="monospace"
-                        fontWeight="semibold"
-                        className="group-hover:fill-white"
-                      >
-                        {dtrFeat.properties.name || dtrFeat.properties.code} ({loadingPct}%)
-                      </text>
-                    </g>
-                  );
-                })}
-              {/* 5. Render Consumers (Optional) */}
-              {showConsumers &&
-                data?.consumers.features.map((cFeat) => {
-                  const pt = getCoordinates(cFeat.geometry.coordinates);
-                  return (
-                    <circle
-                      key={cFeat.properties.id}
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="2"
-                      fill="#60a5fa"
-                      opacity="0.8"
-                      className="cursor-pointer hover:r-3"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAsset({
-                          id: cFeat.properties.id,
-                          code: cFeat.properties.service_number,
-                          entity_type: 'consumer',
-                          provenance: cFeat.properties.provenance,
-                          properties: cFeat.properties,
-                        });
-                      }}
-                    />
-                  );
-                })}
-            </svg>
           )}
+          <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#020617' }} />
         </div>
 
         {/* Slide-in Asset Inspection Drawer */}

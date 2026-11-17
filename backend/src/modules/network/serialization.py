@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from shapely.geometry import LineString, Point
 from backend.src.models import (
     AuditLog,
     Bus,
@@ -46,12 +47,15 @@ def save_synthetic_network_to_db(
     sub_data = net_data["substation"]
     substation = db.query(Substation).filter(Substation.code == sub_data["code"]).first()
     if not substation:
+        sub_lat = sub_data.get("lat", 17.3850)
+        sub_lon = sub_data.get("lon", 78.4867)
         substation = Substation(
             organisation_id=org.id,
             code=sub_data["code"],
             name=sub_data["name"],
             nominal_kv=sub_data["nominal_kv"],
             ptr_capacity_mva=sub_data["ptr_capacity_mva"],
+            geom=Point(sub_lon, sub_lat),
             provenance=ProvenanceEnum.SYNTHETIC.value,
         )
         db.add(substation)
@@ -90,12 +94,15 @@ def save_synthetic_network_to_db(
 
         bus = db.query(Bus).filter(Bus.code == b["bus_id"]).first()
         if not bus:
+            bus_lat = b.get("lat", 17.3850)
+            bus_lon = b.get("lon", 78.4867)
             bus = Bus(
                 feeder_id=target_feeder.id,
                 code=b["bus_id"],
                 name=b["name"],
                 voltage_level_kv=b["voltage_level_kv"],
                 bus_type=b["bus_type"],
+                geom=Point(bus_lon, bus_lat),
                 provenance=ProvenanceEnum.SYNTHETIC.value,
             )
             db.add(bus)
@@ -112,6 +119,10 @@ def save_synthetic_network_to_db(
             from_bus = bus_orm_lookup[line_item["from_bus_id"]]
             to_bus = bus_orm_lookup[line_item["to_bus_id"]]
 
+            line_geom = None
+            if from_bus.geom and to_bus.geom:
+                line_geom = LineString([(from_bus.geom.x, from_bus.geom.y), (to_bus.geom.x, to_bus.geom.y)])
+
             line = Line(
                 feeder_id=target_feeder.id,
                 from_bus_id=from_bus.id,
@@ -123,6 +134,7 @@ def save_synthetic_network_to_db(
                 x_ohm_per_km=line_item["x_ohm_per_km"],
                 max_i_ka=line_item["max_i_ka"],
                 is_operational=line_item["is_operational"],
+                geom=line_geom,
                 provenance=ProvenanceEnum.SYNTHETIC.value,
             )
             db.add(line)
@@ -134,6 +146,8 @@ def save_synthetic_network_to_db(
             from_bus = bus_orm_lookup[sw["from_bus_id"]]
             to_bus = bus_orm_lookup[sw["to_bus_id"]]
 
+            sw_geom = from_bus.geom if from_bus and from_bus.geom else None
+
             switch = Switch(
                 from_bus_id=from_bus.id,
                 to_bus_id=to_bus.id,
@@ -142,6 +156,7 @@ def save_synthetic_network_to_db(
                 is_normally_open=sw["is_normally_open"],
                 current_status=sw["current_status"],
                 is_motorized=sw["is_motorized"],
+                geom=sw_geom,
                 provenance=ProvenanceEnum.SYNTHETIC.value,
             )
             db.add(switch)
@@ -165,6 +180,7 @@ def save_synthetic_network_to_db(
                 full_load_loss_kw=d["full_load_loss_kw"],
                 percent_z=d["percent_z"],
                 is_metered=d["is_metered"],
+                geom=parent_bus.geom,
                 provenance=ProvenanceEnum.SYNTHETIC.value,
             )
             db.add(dtr)

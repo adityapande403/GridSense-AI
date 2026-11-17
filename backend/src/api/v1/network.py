@@ -185,8 +185,13 @@ def get_network_geojson(
         feeder_query = feeder_query.filter(Feeder.code == feeder_code)
     feeders = feeder_query.all()
     feeder_ids = [f.id for f in feeders]
+    substation_ids = [f.substation_id for f in feeders if f.substation_id]
 
-    substations = db.query(Substation).all()
+    substations = (
+        db.query(Substation).filter(Substation.id.in_(substation_ids)).all()
+        if substation_ids
+        else db.query(Substation).all()
+    )
     buses = (
         db.query(Bus).filter(Bus.feeder_id.in_(feeder_ids)).all()
         if feeder_ids
@@ -229,8 +234,16 @@ def get_network_geojson(
     # 1. Substations FeatureCollection
     substation_features = []
     for s in substations:
-        track_point(s.geom)
-        coords = [float(s.geom.x), float(s.geom.y)] if s.geom else [78.4867, 17.3850]
+        if s.geom:
+            track_point(s.geom)
+            coords = [float(s.geom.x), float(s.geom.y)]
+        else:
+            fb = next((b for b in buses if b.geom), None)
+            if fb and fb.geom:
+                coords = [float(fb.geom.x), float(fb.geom.y)]
+                track_point(fb.geom)
+            else:
+                coords = [78.4867, 17.3850]
         substation_features.append(
             {
                 "type": "Feature",
@@ -316,14 +329,17 @@ def get_network_geojson(
     dtr_features = []
     overloaded_count = 0
     for idx, dtr in enumerate(dtrs):
-        track_point(dtr.geom)
         parent_bus = bus_map.get(dtr.bus_id)
         if dtr.geom:
+            track_point(dtr.geom)
             dtr_coords = [float(dtr.geom.x), float(dtr.geom.y)]
         elif parent_bus and parent_bus.geom:
+            track_point(parent_bus.geom)
             dtr_coords = [float(parent_bus.geom.x), float(parent_bus.geom.y)]
         else:
             dtr_coords = [78.48 + idx * 0.005, 17.38 + idx * 0.005]
+            all_lons.append(dtr_coords[0])
+            all_lats.append(dtr_coords[1])
 
         # Calculate or assign loading
         loading_pct = 72.0
@@ -371,9 +387,12 @@ def get_network_geojson(
             track_point(sw.geom)
             sw_coords = [float(sw.geom.x), float(sw.geom.y)]
         elif from_b and from_b.geom:
+            track_point(from_b.geom)
             sw_coords = [float(from_b.geom.x), float(from_b.geom.y)]
         else:
             sw_coords = [78.485, 17.385]
+            all_lons.append(sw_coords[0])
+            all_lats.append(sw_coords[1])
 
         switch_features.append(
             {
@@ -483,8 +502,13 @@ def get_network_sld(
         feeder_query = feeder_query.filter(Feeder.code == feeder_code)
     feeders = feeder_query.all()
     feeder_ids = [f.id for f in feeders]
+    substation_ids = [f.substation_id for f in feeders if f.substation_id]
 
-    substations = db.query(Substation).all()
+    substations = (
+        db.query(Substation).filter(Substation.id.in_(substation_ids)).all()
+        if substation_ids
+        else db.query(Substation).all()
+    )
     buses = (
         db.query(Bus).filter(Bus.feeder_id.in_(feeder_ids)).all()
         if feeder_ids

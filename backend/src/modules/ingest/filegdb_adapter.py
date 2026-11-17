@@ -197,6 +197,7 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
                 name="Puthiya Kadavu 33/11 kV Substation",
                 nominal_kv=33.0,
                 ptr_capacity_mva=5.0,
+                geom=Point(75.76487, 11.27276),
                 source=f"FileGDB:{gdb_path.name}",
                 provenance="assumed",
                 confidence_score=0.90,
