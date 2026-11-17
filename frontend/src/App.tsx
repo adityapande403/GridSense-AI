@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, ShieldAlert, Cpu, Database, Compass, Zap, GitBranch, TrendingUp } from 'lucide-react';
 import { ProvenanceBadge } from './components/ProvenanceBadge';
 import { StatusBadge } from './components/StatusBadge';
+import { NetworkMap } from './views/NetworkMap';
 
 interface SystemHealth {
   status: string;
@@ -113,119 +114,145 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Body */}
       <main className="flex-1 p-6 space-y-6">
-        {/* Tier 1 Delivery Status Banner */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs uppercase font-mono tracking-wider text-blue-400">
-                Milestone 1 Verification Gate
-              </span>
-              <h2 className="text-lg font-semibold text-white mt-1">
-                Modular Monolith Architecture & Database Registry Initialized
-              </h2>
-              <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-                GridSense-AI repository skeleton established with explicit domain module boundaries, reversible
-                Alembic migrations, standard Indian distribution equipment defaults, and test suites.
-              </p>
-            </div>
-            <StatusBadge status="VALIDATED_FEASIBLE" />
-          </div>
+        {activeTab === 'map' && <NetworkMap />}
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-              <span className="text-xs text-slate-500 font-mono">ASSET REGISTRY</span>
-              <div className="text-base font-semibold text-slate-200 mt-1">20 Relational Models</div>
-              <div className="mt-2">
-                <ProvenanceBadge provenance="assumed" />
-              </div>
-            </div>
-
-            <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-              <span className="text-xs text-slate-500 font-mono">STATUTORY VOLTAGE</span>
-              <div className="text-base font-semibold text-slate-200 mt-1">11 kV ± 6.0% Band</div>
-              <div className="mt-2">
-                <ProvenanceBadge provenance="assumed" />
-              </div>
-            </div>
-
-            <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-              <span className="text-xs text-slate-500 font-mono">RECONFIGURATION SOLVER</span>
-              <div className="text-base font-semibold text-slate-200 mt-1">Pyomo + HiGHS MILP</div>
-              <div className="mt-2">
-                <ProvenanceBadge provenance="synthetic" />
-              </div>
-            </div>
-
-            <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-              <span className="text-xs text-slate-500 font-mono">LOSS VALUATION</span>
-              <div className="text-base font-semibold text-slate-200 mt-1">₹5.50 per kWh (ACoS)</div>
-              <div className="mt-2">
-                <ProvenanceBadge provenance="assumed" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Technical Principles & Gating Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-              <ShieldAlert className="w-4 h-4 text-emerald-400" />
-              <span>A5 Approval Taxonomy (Strictly Enforced)</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Every switching or capital recommendation receives exactly one status based on independent AC power
-              flow convergence, radiality preservation, and protection data availability.
-            </p>
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">AC Converged & Protected:</span>
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Tier 1 Delivery Status Banner */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-xs uppercase font-mono tracking-wider text-blue-400">
+                    Milestone 4 Verification Gate
+                  </span>
+                  <h2 className="text-lg font-semibold text-white mt-1">
+                    Geospatial Digital Twin Visualization & Asset Inspection Operational
+                  </h2>
+                  <p className="text-sm text-slate-400 mt-1 max-w-3xl">
+                    High-contrast electrical Single Line Diagram (SLD) map canvas with color-coded voltage symbology,
+                    loading thresholds, normally-open tie switch tracking, and inspectable mathematical provenance.
+                  </p>
+                </div>
                 <StatusBadge status="VALIDATED_FEASIBLE" />
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Protection Unverified:</span>
-                <StatusBadge status="FEASIBLE_PROTECTION_UNVERIFIED" />
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Constraint Violated:</span>
-                <StatusBadge status="NOT_FEASIBLE" />
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-              <Compass className="w-4 h-4 text-blue-400" />
-              <span>Data Provenance Tracking</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Every metric, coordinate, and state is explicitly tagged. Fabricated simulation outputs or uncalibrated
-              predictions are strictly prohibited.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ProvenanceBadge provenance="measured" />
-              <ProvenanceBadge provenance="estimated" />
-              <ProvenanceBadge provenance="predicted" />
-              <ProvenanceBadge provenance="synthetic" />
-              <ProvenanceBadge provenance="assumed" />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+                  <span className="text-xs text-slate-500 font-mono">ASSET REGISTRY</span>
+                  <div className="text-base font-semibold text-slate-200 mt-1">20 Relational Models</div>
+                  <div className="mt-2">
+                    <ProvenanceBadge provenance="measured" />
+                  </div>
+                </div>
 
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-              <Cpu className="w-4 h-4 text-cyan-400" />
-              <span>Next Milestone Gate: M2</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Seeded, reproducible synthetic network generator for Telangana-style 33/11 kV feeders with agricultural
-              pump rostering and IEEE 33-bus algorithmic verification benchmarks.
-            </p>
-            <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex justify-between items-center">
-              <span>Ready for Milestone 2:</span>
-              <span className="text-emerald-400 font-semibold">GATE CLEARED</span>
+                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+                  <span className="text-xs text-slate-500 font-mono">STATUTORY VOLTAGE</span>
+                  <div className="text-base font-semibold text-slate-200 mt-1">11 kV ± 6.0% Band</div>
+                  <div className="mt-2">
+                    <ProvenanceBadge provenance="assumed" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+                  <span className="text-xs text-slate-500 font-mono">BROWNFIELD GIS TWIN</span>
+                  <div className="text-base font-semibold text-slate-200 mt-1">KSEB 4 DTRs / 34 Lines</div>
+                  <div className="mt-2">
+                    <ProvenanceBadge provenance="measured" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+                  <span className="text-xs text-slate-500 font-mono">LOSS VALUATION</span>
+                  <div className="text-base font-semibold text-slate-200 mt-1">₹5.50 per kWh (ACoS)</div>
+                  <div className="mt-2">
+                    <ProvenanceBadge provenance="assumed" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Technical Principles & Gating Information */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-emerald-400" />
+                  <span>A5 Approval Taxonomy (Strictly Enforced)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Every switching or capital recommendation receives exactly one status based on independent AC power
+                  flow convergence, radiality preservation, and protection data availability.
+                </p>
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">AC Converged & Protected:</span>
+                    <StatusBadge status="VALIDATED_FEASIBLE" />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Protection Unverified:</span>
+                    <StatusBadge status="FEASIBLE_PROTECTION_UNVERIFIED" />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Constraint Violated:</span>
+                    <StatusBadge status="NOT_FEASIBLE" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                  <Compass className="w-4 h-4 text-blue-400" />
+                  <span>Data Provenance Tracking</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Every metric, coordinate, and state is explicitly tagged. Fabricated simulation outputs or uncalibrated
+                  predictions are strictly prohibited.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ProvenanceBadge provenance="measured" />
+                  <ProvenanceBadge provenance="estimated" />
+                  <ProvenanceBadge provenance="predicted" />
+                  <ProvenanceBadge provenance="synthetic" />
+                  <ProvenanceBadge provenance="assumed" />
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <span>Next Milestone Gate: M5</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  AC Physics Engine integration with pandapower Newton-Raphson solver, limits verification, and contingency screening.
+                </p>
+                <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex justify-between items-center">
+                  <span>Ready for Milestone 5:</span>
+                  <span className="text-emerald-400 font-semibold">GATE CLEARED</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {(activeTab === 'switching' || activeTab === 'capex' || activeTab === 'scenarios') && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+              {activeTab === 'switching'
+                ? 'Switching & FLISR Workbench (Milestone 8)'
+                : activeTab === 'capex'
+                ? 'CAPEX Intelligence Planner (Milestone 9)'
+                : 'Scenario Simulator Sandbox (Milestone 10)'}
+            </h3>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              In accordance with Non-negotiable Principle A4-11, this module is staged for delivery in its respective milestone.
+            </p>
+            <span className="inline-block px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono text-amber-400">
+              STATUS: STAGED IN PIPELINE
+            </span>
+          </div>
+        )}
       </main>
 
       {/* Footer */}

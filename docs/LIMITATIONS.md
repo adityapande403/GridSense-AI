@@ -78,6 +78,16 @@
   - Spatial proximity snapping rules engine proposing candidate connections without auto-mutating authoritative topology (Principles A4-4, A4-9, A6).
   - REST API endpoints for dataset validation, GeoJSON/CSV/GDB ingestion, topology consistency verification, and candidate approval.
 
+### Milestone 4 Completed State & Remaining Limitations
+
+- **M4 Completed Capabilities:**
+  - REST GeoJSON digital twin export API (`GET /api/v1/network/geojson`) with layer-level provenance tags, bounding boxes, and feeder filtering.
+  - Single Line Diagram (SLD) hierarchical schematic API (`GET /api/v1/network/sld`).
+  - Interactive React digital twin map canvas (`frontend/src/views/NetworkMap.tsx`) with dark-mode electrical SLD styling, color-coded voltage symbology (33 kV vs 11 kV), loading thresholds (<80%, 80-100%, >100%), and normally-open tie point rendering.
+  - Interactive `AssetInspectionDrawer` with real-time/simulated electrical telemetry, kVA ratings, conductor specs, and provenance indicators.
+  - Clickable `CalculationModal` displaying hand-verifiable mathematical formulas (LaTeX), inputs, assumptions, and standards for any asset metric.
+  - Seamless feeder switcher between Telangana synthetic twin and ingested KSEB Puthiya Kadavu network.
+
 - **Current Limitations (To be addressed in upcoming milestones):**
-  - Geospatial map rendering on MapLibre GL JS not yet integrated with live backend GeoJSON endpoints (M4).
-  - Physics AC power-flow engine wrapper (M5) not yet wired to run dynamic simulation over ingested FileGDB networks.
+  - Physics AC power-flow engine wrapper (M5) not yet wired to run live dynamic simulations directly on user-initiated switching actions.
+  - Reconfiguration and FLISR automation (M8) not yet connected to the map view.

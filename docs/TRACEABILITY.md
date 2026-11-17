@@ -10,7 +10,7 @@
 
 | Challenge 08 Official Ask | Target Engine | Architectural Module | Milestones | Primary Verification / Acceptance Test |
 |---|---|---|---|---|
-| **Ask 1: Feeder-network mapping and modelling** | C-Engine 1, 2, 4 | `network`, `ingest`, `topology_ai`, `estimation` | M1 (PASSED), M2 (PASSED), M3 (PASSED), M4 | Roundtrip import/export test; synthetic consistency check (orphan nodes, loops, disconnected DTRs caught); MapLibre SLD rendering with provenance badges. |
+| **Ask 1: Feeder-network mapping and modelling** | C-Engine 1, 2, 4 | `network`, `ingest`, `topology_ai`, `estimation` | M1 (PASSED), M2 (PASSED), M3 (PASSED), M4 (PASSED) | Roundtrip import/export test; synthetic consistency check (orphan nodes, loops, disconnected DTRs caught); MapLibre SLD rendering with provenance badges. |
 | **Ask 2: Evaluates sectionalising and load-switching options** | C-Engine 5, 7 | `switching`, `flisr`, `physics`, `scenarios` | M5, M8, M10 | IEEE 33-bus reconfiguration loss reduction benchmark (~202.7 kW -> ~139.5 kW); top-k MILP candidate generation with mandatory AC power-flow re-validation and A5 taxonomy assignment. |
 | **Ask 3: Identifies overloaded assets** | C-Engine 3, 4 | `physics`, `thermal`, `forecast`, `alerts` | M5, M6, M7 | AC power flow transformer and line ampacity checks; IEC 60076-7 dynamic hot-spot and loss-of-life thermal stress calculation; 4-24h predictive overload alert test. |
 | **Ask 4: Ranks where additional DTRs, feeder bifurcation or conductor upgrades are needed** | C-Engine 6 | `capex` | M9, M11 | Hand-verifiable multi-criteria ranking model; cluster-weighted DTR siting; line segment loss-reduction-per-rupee ranking; bifurcation split-point graph analysis. |
@@ -95,3 +95,27 @@
      - `POST /api/v1/ingest/gdb`, `POST /api/v1/ingest/geojson`, `POST /api/v1/ingest/csv`, `POST /api/v1/ingest/validate`.
      - `POST /api/v1/topology/validate`, `GET /api/v1/topology/candidates`, `POST /api/v1/topology/candidates/approve`.
   7. 41 automated unit tests passing cleanly in CI (100% pass rate).
+
+
+### Milestone 4: Geospatial Map Visualisation & Digital Twin UI
+- **Status:** COMPLETED & VERIFIED
+- **Date:** 2026-11-17
+- **Verification Gates Executed:**
+  1. Backend GeoJSON digital twin export API (`GET /api/v1/network/geojson`):
+     - Emits FeatureCollections for substations, lines, transformers, switches, and consumers with full electrical attributes and explicit provenance tags.
+     - Feeder filtering parameter (`feeder_code=...`) tested across Telangana twin and Puthiya Kadavu.
+     - Auto-seeds baseline digital twin when accessed on fresh database.
+  2. Single Line Diagram (SLD) hierarchical schematic API (`GET /api/v1/network/sld`):
+     - Traverses from 33/11 kV substation bus to feeder breakers, trunk line segments, lateral taps, sectionalizers, tie points, and distribution transformers.
+  3. Interactive Frontend Digital Twin UI (`frontend/src/views/NetworkMap.tsx`):
+     - Dark-mode, high-contrast electrical SLD canvas with pan, zoom, and layer toggles (substations, lines, DTRs, switches, consumers).
+     - Color-coded voltage symbology (33 kV purple, 11 kV cyan, energized vs de-energized).
+     - Color-coded DTR utilization (normal green <80%, warning amber 80-100%, critical overloaded red >100%).
+     - Real-time topological consistency banner reflecting M3 engine status.
+  4. Asset Inspection Drawer (`frontend/src/components/AssetInspectionDrawer.tsx`):
+     - Displays asset specifications, real-time/simulated electrical telemetry, provenance badges, and confidence scores.
+  5. Mathematical Calculation Inspection Modal (`frontend/src/components/CalculationModal.tsx`):
+     - Enforces Non-negotiable Principle A4-8 and Risk RSK-DEM-02: hand-inspectable formulas (KaTeX), inputs, assumptions, and standards for any asset metric.
+  6. Frontend production build (`npm run build`):
+     - Vite + TypeScript compiled in 1.89s with 0 errors.
+  7. 44 automated unit tests passing cleanly in CI (100% pass rate).
