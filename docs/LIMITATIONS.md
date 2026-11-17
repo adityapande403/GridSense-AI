@@ -58,3 +58,17 @@
   - Network generator (M2) and benchmark network loaders not yet implemented.
   - GIS shapefile/GeoJSON ingestion parsers (M3) not yet wired to database persistence.
   - Physics AC power-flow engine wrapper (M5) not yet connected to database topology instances.
+
+
+### Milestone 2 Completed State & Remaining Limitations
+
+- **M2 Completed Capabilities:**
+  - Standard IEEE 33-bus and IEEE 69-bus benchmark network loaders with published reference loss comparisons.
+  - Deterministic, seeded synthetic distribution network generator for Telangana-style 33/11 kV networks with 24-hour diurnal profiles, agricultural scheduled pumping blocks, and injected operational scenarios.
+  - Relational database persistence pipeline saving synthetic networks into immutable topology versions with audit trails.
+  - Automated AC convergence verified across 100 seeded networks.
+
+- **Current Limitations (To be addressed in upcoming milestones):**
+  - Ingestion of arbitrary GIS files (Shapefile, GeoJSON, CSV) from disk via declarative column mapping not yet implemented (M3).
+  - Graph-based topological consistency checks (orphan nodes, loops, disconnected DTRs) not yet wired into an ingestion validator report (M3).
+  - Geospatial map rendering on MapLibre GL JS not yet integrated with live backend GeoJSON endpoints (M4).

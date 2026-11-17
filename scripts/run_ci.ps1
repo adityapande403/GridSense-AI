@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ Linter checks passed cleanly." -ForegroundColor Green
 
 # 2. Test Alembic Migrations
-Write-Host "`n[2/3] Verifying Alembic Migrations (Upgrade Head)..." -ForegroundColor Yellow
+Write-Host "`n[2/3] Verifying Alembic Migrations [Upgrade Head]..." -ForegroundColor Yellow
 & .\.venv\Scripts\alembic.exe -c backend/alembic.ini upgrade head
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Alembic migration failed!" -ForegroundColor Red
