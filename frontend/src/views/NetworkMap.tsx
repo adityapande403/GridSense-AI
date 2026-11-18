@@ -134,21 +134,36 @@ export const NetworkMap: React.FC = () => {
       const lineRes = pfData.lines.find((l) => l.line_code === code);
       if (lineRes) {
         const loading = lineRes.loading_percent;
-        let color = '#10b981'; // <= 80% Normal
+        let color = '#10b981'; // <= 20% Low / Healthy
         let weight = isHT ? 4.5 : 3.0;
+
         if (loading > 120.0) {
-          color = '#dc2626'; // Emergency
-          weight = isHT ? 6.5 : 5.0;
+          color = '#dc2626'; // Emergency (>120%)
+          weight = isHT ? 7.5 : 5.5;
         } else if (loading > 100.0) {
-          color = '#ef4444'; // Overload
-          weight = isHT ? 5.5 : 4.0;
+          color = '#ef4444'; // Overload (100-120%)
+          weight = isHT ? 6.5 : 5.0;
         } else if (loading > 80.0) {
-          color = '#f59e0b'; // Elevated
+          color = '#f97316'; // Near-Capacity (80-100%)
+          weight = isHT ? 5.5 : 4.0;
+        } else if (loading > 50.0) {
+          color = '#f59e0b'; // Elevated (50-80%)
           weight = isHT ? 5.0 : 3.5;
+        } else if (loading > 20.0) {
+          color = '#06b6d4'; // Moderate (20-50%)
+          weight = isHT ? 4.5 : 3.0;
+        } else {
+          color = '#10b981'; // Low (<20%)
+          weight = isHT ? 4.0 : 2.5;
         }
+
         polyline.setStyle({ color, weight, opacity: 1.0 });
       } else {
-        polyline.setStyle({ color: defaultColor, weight: defaultWeight, opacity: 0.5 });
+        polyline.setStyle({
+          color: active ? '#0284c7' : defaultColor,
+          weight: defaultWeight,
+          opacity: active ? 0.65 : 0.75,
+        });
       }
     });
   };
@@ -185,10 +200,12 @@ export const NetworkMap: React.FC = () => {
   const handleRunContingency = async () => {
     setIsSimulating(true);
     try {
-      const res = await fetch(`/api/v1/physics/contingency/n-1?feeder_code=${selectedFeeder}&ambient_temp_c=35&load_multiplier=1.0`);
+      const res = await fetch(`/api/v1/physics/contingency/n-1?feeder_code=${selectedFeeder}&ambient_temp_c=35&load_multiplier=1.0`, {
+        method: 'POST',
+      });
       if (!res.ok) {
         const errJson = await res.json();
-        alert(`Contingency Screening Error: ${JSON.stringify(errJson)}`);
+        alert(`Contingency Screening Error (HTTP ${res.status}): ${errJson.detail?.message || JSON.stringify(errJson.detail || errJson)}`);
         return;
       }
       const report: ContingencyReportData = await res.json();
@@ -381,6 +398,7 @@ export const NetworkMap: React.FC = () => {
       .then((resData: NetworkGeoJSONResponse) => {
         setData(resData);
         setLoading(false);
+        handleRunPowerFlow(1.0, 35.0);
       })
       .catch((err) => {
         console.error('Error fetching network geojson:', err);
@@ -653,6 +671,10 @@ export const NetworkMap: React.FC = () => {
           ltLines.addLayer(polyline);
         }
       });
+
+      if (powerFlowData && heatmapActive) {
+        applyHeatmapStyles(powerFlowData, true);
+      }
     }
 
     // B. Render Physical Poles & Support Structures (distinguishing DP substation structures from standard poles)

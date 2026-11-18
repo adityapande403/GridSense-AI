@@ -105,8 +105,9 @@ def list_simulation_feeders(db: Session = Depends(get_db)) -> List[Dict[str, Any
     return feeders_list
 
 
-@router.post(
+@router.api_route(
     "/contingency/n-1",
+    methods=["GET", "POST"],
     response_model=ContingencyScreeningReport,
     summary="Execute Single-Contingency N-1 Line Outage Screening (TR-PHY-07)",
 )
@@ -139,8 +140,9 @@ def execute_n1_screening(
     return report
 
 
-@router.post(
+@router.api_route(
     "/short-circuit/screening",
+    methods=["GET", "POST"],
     response_model=ShortCircuitScreeningReport,
     summary="Execute IEC 60909 Short-Circuit Fault Screening (TR-PHY-08)",
 )
