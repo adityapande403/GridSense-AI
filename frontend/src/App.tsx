@@ -127,12 +127,12 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Body */}
       <main
-        className={`flex-1 ${
+        className={`flex-1 min-h-0 ${
           activeTab === 'map'
             ? isMapFullscreen
               ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
-              : 'relative w-full h-[calc(100vh-7.5rem)] p-0 m-0 overflow-hidden bg-slate-950'
-            : 'p-6 space-y-6'
+              : 'relative w-full h-full p-0 m-0 overflow-hidden bg-slate-950'
+            : 'p-6 space-y-6 overflow-y-auto'
         }`}
       >
         {activeTab === 'map' && (
@@ -281,11 +281,13 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-900 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
-        <span>GridSense-AI Platform &bull; Telangana Innovation Startup Challenge 2026</span>
-        <span>Advisory Distribution Intelligence &bull; TSSPDCL / TSNPDCL</span>
-      </footer>
+      {/* Footer (hidden on full-bleed digital twin map) */}
+      {activeTab !== 'map' && (
+        <footer className="bg-slate-950 border-t border-slate-900 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
+          <span>GridSense-AI Platform &bull; Telangana Innovation Startup Challenge 2026</span>
+          <span>Advisory Distribution Intelligence &bull; TSSPDCL / TSNPDCL</span>
+        </footer>
+      )}
     </div>
   );
 };

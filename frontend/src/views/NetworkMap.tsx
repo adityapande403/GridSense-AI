@@ -1195,7 +1195,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   return (
     <div
       className={`relative w-full ${
-        isFullscreen ? 'h-screen' : 'h-[calc(100vh-7.5rem)]'
+        isFullscreen ? 'h-screen' : 'h-full'
       } min-h-[500px] overflow-hidden bg-slate-950 select-none`}
     >
       {/* 1. Giant Full-Bleed Leaflet Map Canvas Background */}
