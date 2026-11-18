@@ -135,17 +135,19 @@ export const NetworkMap: React.FC = () => {
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       minZoom: 3,
-      maxZoom: 20,
+      maxZoom: 22,
     }).setView([11.2687, 75.7665], 16);
 
-    // Initial tile layer: Carto Voyager raster tiles with user's API key
+    // Initial tile layer: Carto Voyager High-DPI (@2x) raster tiles with user's API key
     const tileLayer = L.tileLayer(
-      `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`,
+      `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
       {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        maxNativeZoom: 19,
-        maxZoom: 20,
+        maxNativeZoom: 18,
+        maxZoom: 22,
+        tileSize: 256,
+        keepBuffer: 8,
       }
     ).addTo(map);
 
@@ -219,35 +221,41 @@ export const NetworkMap: React.FC = () => {
 
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
 
-    let url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
-    let attr =
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    let url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+    let attr = '&copy; OpenStreetMap contributors &copy; CARTO';
     let sub = 'abc';
+    let nativeZoom = 18;
 
     if (baseMap === 'carto-voyager') {
-      url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+      url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
       attr = '&copy; OpenStreetMap contributors &copy; CARTO';
       sub = 'abc';
+      nativeZoom = 18;
     } else if (baseMap === 'carto-dark') {
-      url = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+      url = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
       attr = '&copy; OpenStreetMap contributors &copy; CARTO';
       sub = 'abc';
+      nativeZoom = 18;
     } else if (baseMap === 'osm') {
       url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       attr = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
       sub = 'abc';
+      nativeZoom = 19;
     } else if (baseMap === 'satellite') {
       url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       attr =
         'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
       sub = 'abc';
+      nativeZoom = 18;
     }
 
     const newTileLayer = L.tileLayer(url, {
       attribution: attr,
       subdomains: sub,
-      maxNativeZoom: 19,
-      maxZoom: 20,
+      maxNativeZoom: nativeZoom,
+      maxZoom: 22,
+      tileSize: 256,
+      keepBuffer: 8,
     }).addTo(mapInstanceRef.current);
 
     tileLayerRef.current = newTileLayer;
@@ -1242,7 +1250,16 @@ export const NetworkMap: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
-          <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#020617' }} />
+          <div
+            ref={mapContainerRef}
+            className="w-full h-full transition-colors duration-200"
+            style={{
+              background:
+                baseMap === 'carto-voyager' || baseMap === 'osm'
+                  ? '#e2e8f0'
+                  : '#020617',
+            }}
+          />
         </div>
 
         {/* Unified High-Resolution Cluster Magnifier Window (Works for All Network Attributes) */}

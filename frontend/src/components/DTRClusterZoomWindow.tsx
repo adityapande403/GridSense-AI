@@ -353,18 +353,24 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         maxZoom: 24, // Allow ultra high zoom up to 24x
       }).setView(center, 21.5);
 
-      let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+      let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      let nativeZoom = 18;
       if (baseMap === 'carto-dark') {
-        tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+        tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+        nativeZoom = 18;
       } else if (baseMap === 'osm') {
         tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        nativeZoom = 19;
       } else if (baseMap === 'satellite') {
         tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+        nativeZoom = 18;
       }
 
       const tileLayer = L.tileLayer(tileUrl, {
-        maxNativeZoom: 19,
+        maxNativeZoom: nativeZoom,
         maxZoom: 24,
+        tileSize: 256,
+        keepBuffer: 8,
       }).addTo(map);
       tileLayerRef.current = tileLayer;
 
@@ -423,18 +429,24 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
 
-    let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+    let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+    let nativeZoom = 18;
     if (baseMap === 'carto-dark') {
-      tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+      tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      nativeZoom = 18;
     } else if (baseMap === 'osm') {
       tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      nativeZoom = 19;
     } else if (baseMap === 'satellite') {
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      nativeZoom = 18;
     }
 
     const newTileLayer = L.tileLayer(tileUrl, {
-      maxNativeZoom: 19,
+      maxNativeZoom: nativeZoom,
       maxZoom: 24,
+      tileSize: 256,
+      keepBuffer: 8,
     }).addTo(mapInstanceRef.current);
 
     tileLayerRef.current = newTileLayer;
@@ -1223,7 +1235,15 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       </div>
 
       {/* Interactive High-Res Mini-Map Canvas */}
-      <div className="flex-1 relative w-full h-full bg-slate-950">
+      <div
+        className="flex-1 relative w-full h-full transition-colors duration-200"
+        style={{
+          background:
+            baseMap === 'carto-voyager' || baseMap === 'osm'
+              ? '#e2e8f0'
+              : '#020617',
+        }}
+      >
         <div ref={mapContainerRef} className="w-full h-full" />
       </div>
 
