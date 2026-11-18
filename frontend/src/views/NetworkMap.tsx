@@ -710,6 +710,7 @@ export const NetworkMap: React.FC = () => {
         });
 
         marker.on('click', () => {
+          mapInstanceRef.current?.closePopup();
           const dtrAsset: SelectedAsset = {
             id: dtrFeat.properties.id,
             code: dtrFeat.properties.code,
@@ -993,6 +994,7 @@ export const NetworkMap: React.FC = () => {
           dtr={selectedDTR}
           networkData={data}
           baseMap={baseMap}
+          isDrawerOpen={selectedAsset !== null}
           onSelectAsset={(asset) => setSelectedAsset(asset)}
         />
 
