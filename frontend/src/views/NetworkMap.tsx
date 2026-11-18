@@ -242,11 +242,10 @@ export const NetworkMap: React.FC = () => {
       sub = 'abc';
       nativeZoom = 19;
     } else if (baseMap === 'satellite') {
-      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      attr =
-        'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
-      sub = 'abc';
-      nativeZoom = 18;
+      url = 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+      attr = 'Satellite &copy; Google &bull; Maxar Technologies (30cm Optical HD)';
+      sub = '0123';
+      nativeZoom = 20;
     }
 
     const newTileLayer = L.tileLayer(url, {

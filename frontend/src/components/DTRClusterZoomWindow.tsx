@@ -355,6 +355,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
       let nativeZoom = 18;
+      let sub = 'abc';
       if (baseMap === 'carto-dark') {
         tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
         nativeZoom = 18;
@@ -362,11 +363,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
         nativeZoom = 19;
       } else if (baseMap === 'satellite') {
-        tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        nativeZoom = 18;
+        tileUrl = 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        nativeZoom = 20;
+        sub = '0123';
       }
 
       const tileLayer = L.tileLayer(tileUrl, {
+        subdomains: sub,
         maxNativeZoom: nativeZoom,
         maxZoom: 24,
         tileSize: 256,
@@ -431,6 +434,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
     let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
     let nativeZoom = 18;
+    let sub = 'abc';
     if (baseMap === 'carto-dark') {
       tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
       nativeZoom = 18;
@@ -438,11 +442,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       nativeZoom = 19;
     } else if (baseMap === 'satellite') {
-      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      nativeZoom = 18;
+      tileUrl = 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+      nativeZoom = 20;
+      sub = '0123';
     }
 
     const newTileLayer = L.tileLayer(tileUrl, {
+      subdomains: sub,
       maxNativeZoom: nativeZoom,
       maxZoom: 24,
       tileSize: 256,
