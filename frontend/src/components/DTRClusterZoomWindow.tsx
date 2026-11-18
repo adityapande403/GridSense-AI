@@ -51,6 +51,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
   const [dpCount, setDpCount] = useState<number>(0);
   const [stdPolesCount, setStdPolesCount] = useState<number>(0);
+  const [mapReady, setMapReady] = useState<number>(0);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -140,9 +141,39 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     return code.length > 10 ? code.slice(-6) : code;
   };
 
-  // 1. Initialize or Re-center Cluster Mini-Map with Extra High Zoom
+  // 1. Initialize, Re-center or Dispose Cluster Mini-Map with Extra High Zoom
   useEffect(() => {
-    if (!isOpen || !mapContainerRef.current) return;
+    // If closed, cleanly tear down Leaflet instance and free memory
+    if (!isOpen) {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          // ignore
+        }
+        mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        clusterLayersRef.current = null;
+      }
+      return;
+    }
+
+    if (!mapContainerRef.current) return;
+
+    // Guard: Verify existing map is still attached to the active DOM element
+    if (mapInstanceRef.current) {
+      const container = mapInstanceRef.current.getContainer();
+      if (!container || container !== mapContainerRef.current || !document.body.contains(container)) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          // ignore
+        }
+        mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        clusterLayersRef.current = null;
+      }
+    }
 
     if (!mapInstanceRef.current) {
       const center = centerCoords || [11.270127, 75.765721];
@@ -185,21 +216,31 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       };
 
       mapInstanceRef.current = map;
+      // Notify feature renderer that fresh map is ready
+      setMapReady((v) => v + 1);
     } else if (centerCoords) {
       mapInstanceRef.current.setView(centerCoords, 21.5);
     }
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       mapInstanceRef.current?.invalidateSize();
-    }, 150);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [isOpen, centerCoords?.[0], centerCoords?.[1], isExpanded]);
 
   // Clean cleanup on component unmount
   useEffect(() => {
     return () => {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          // ignore
+        }
         mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        clusterLayersRef.current = null;
       }
     };
   }, []);
@@ -645,6 +686,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     }
   }, [
     isOpen,
+    mapReady,
     centerCoords?.[0],
     centerCoords?.[1],
     networkData,

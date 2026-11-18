@@ -17,9 +17,14 @@ export interface SelectedAsset {
 interface AssetInspectionDrawerProps {
   asset: SelectedAsset | null;
   onClose: () => void;
+  onOpenClusterZoom?: (asset: SelectedAsset) => void;
 }
 
-export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ asset, onClose }) => {
+export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
+  asset,
+  onClose,
+  onOpenClusterZoom,
+}) => {
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
 
   if (!asset) return null;
@@ -344,6 +349,20 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
                 </div>
               )}
             </div>
+          )}
+
+          {/* Open Micro-Zoom Cluster Window CTA */}
+          {onOpenClusterZoom && (asset.entity_type === 'pole' || asset.entity_type === 'distribution_transformer') && (
+            <button
+              onClick={() => onOpenClusterZoom(asset)}
+              className="w-full flex items-center justify-between p-3.5 bg-orange-950/40 hover:bg-orange-900/50 border border-orange-700/60 rounded-xl text-orange-200 hover:text-white transition-all text-xs font-semibold group shadow-sm"
+            >
+              <div className="flex items-center space-x-2">
+                <Gauge className="w-4 h-4 text-orange-400 group-hover:scale-110 transition-transform" />
+                <span>Open Micro-Zoom Cluster Window (21.5x)</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-orange-400" />
+            </button>
           )}
 
           {/* Inspect Calculations CTA (Principle A4-8) */}

@@ -642,9 +642,8 @@ export const NetworkMap: React.FC = () => {
 
         circleMarker.on('click', () => {
           setSelectedAsset(poleAsset);
-          if (isClusterZoomOpen) {
-            setSelectedClusterAsset(poleAsset);
-          }
+          setSelectedClusterAsset(poleAsset);
+          setIsClusterZoomOpen(true);
         });
 
         circleMarker.on('dblclick', (e) => {
@@ -1232,6 +1231,10 @@ export const NetworkMap: React.FC = () => {
         <AssetInspectionDrawer
           asset={selectedAsset}
           onClose={handleCloseDrawer}
+          onOpenClusterZoom={(asset) => {
+            setSelectedClusterAsset(asset);
+            setIsClusterZoomOpen(true);
+          }}
         />
       </div>
     </div>
