@@ -69,14 +69,22 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
       const rOhm = props.r_ohm_per_km || 0.9075;
       const xOhm = props.x_ohm_per_km || 0.377;
       const maxAmp = (props.max_i_ka || 0.134) * 1000;
+      const pf = props.physics_result;
 
       setModalDetails({
-        title: `Line Series Impedance & Capacity: ${asset.code}`,
-        metric: 'Branch Series Impedance (Z = R + jX)',
-        formula: 'Z_branch = (r_ohm_per_km + j * x_ohm_per_km) * length_km',
-        latexFormula: 'Z_{\\text{branch}} = (R + jX) \\cdot L_{\\text{km}}',
-        description:
-          'Series resistance and inductive reactance computed from physical conductor cross-section and geodesic path length. Governs positive-sequence voltage drop in AC Newton-Raphson power flow.',
+        title: `Line Series Impedance & Physics Lineage: ${asset.code}`,
+        metric: pf
+          ? `Thermal Loading: ${pf.loading_percent}% (Loss: ${pf.active_loss_kw} kW)`
+          : 'Branch Series Impedance (Z = R + jX)',
+        formula: pf
+          ? `P_loss = 3 * I^2 * R * L = 3 * (${(pf.current_ka * 1000).toFixed(1)} A)^2 * ${rOhm} Ω/km * ${lengthKm} km = ${pf.active_loss_kw} kW`
+          : 'Z_branch = (r_ohm_per_km + j * x_ohm_per_km) * length_km',
+        latexFormula: pf
+          ? 'P_{\\text{loss}} = 3 \\cdot I_{\\text{line}}^2 \\cdot R_{\\text{cond}} \\cdot L_{\\text{km}}'
+          : 'Z_{\\text{branch}} = (R + jX) \\cdot L_{\\text{km}}',
+        description: pf
+          ? 'Solved via balanced AC Newton-Raphson power flow (pandapower core). Line loading computed against ambient-derated ampacity per IEEE Std 738.'
+          : 'Series resistance and inductive reactance computed from physical conductor cross-section and geodesic path length. Governs positive-sequence voltage drop in AC Newton-Raphson power flow.',
         inputs: {
           'Conductor Type': props.conductor_type || 'ACSR_Weasel',
           'Total Length (km)': lengthKm,
@@ -84,21 +92,33 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
           'Reactance X (Ω/km)': xOhm,
           'Total Branch Resistance (Ω)': (rOhm * lengthKm).toFixed(4),
           'Total Branch Reactance (Ω)': (xOhm * lengthKm).toFixed(4),
-          'Thermal Ampacity (A)': maxAmp.toFixed(0),
+          ...(pf
+            ? {
+                'Operating Current (A)': (pf.current_ka * 1000).toFixed(1),
+                'Active Technical Loss (kW)': pf.active_loss_kw,
+                'Reactive Technical Loss (kVAr)': pf.reactive_loss_kvar,
+                'Derated Ampacity (A)': (pf.max_i_ka * 1000).toFixed(1),
+                'Pandapower Loading (%)': `${pf.loading_percent}%`,
+              }
+            : {
+                'Thermal Ampacity (A)': maxAmp.toFixed(0),
+              }),
         },
         assumptions: [
           'Conductor temperature normalized to 75°C operating resistance.',
           'Geometry follows surveyed pole coordinates.',
+          'Ampacity derated per IEEE Std 738 ambient temperature curve.',
         ],
         constraints: [
           'Branch current I ≤ Thermal Ampacity (I_max).',
-          'Statutory voltage drop across feeder ≤ 6.0%.',
+          'Statutory voltage drop across feeder ≤ 6.0% (TGERC).',
         ],
         sourceStandards: [
           'REC Construction Standards & BIS 398 Part 2 Specification',
+          'IEEE Std 738-2012 Standard for Calculating Bare Overhead Conductor Temperature and Ampacity',
           'TGERC Distribution Supply Code 2024',
         ],
-        provenance: asset.provenance,
+        provenance: pf ? 'estimated' : asset.provenance,
         confidenceScore: asset.confidence_score || 0.90,
       });
     }
@@ -213,6 +233,49 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
           {/* Line Specific Metrics */}
           {asset.entity_type === 'line' && (
             <div className="space-y-4">
+              {props.physics_result && (
+                <div className="bg-cyan-950/40 border border-cyan-800/60 rounded-xl p-4 space-y-2 font-mono text-xs shadow-lg">
+                  <div className="flex items-center justify-between pb-2 border-b border-cyan-800/40">
+                    <span className="text-cyan-300 font-bold flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-cyan-400" /> AC Newton-Raphson Results
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        props.physics_result.status === 'emergency'
+                          ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
+                          : props.physics_result.status === 'overload'
+                          ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                          : props.physics_result.status === 'elevated'
+                          ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                          : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      }`}
+                    >
+                      {props.physics_result.status.toUpperCase()} ({props.physics_result.loading_percent}%)
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-cyan-900/40">
+                    <span className="text-slate-400">Loading %:</span>
+                    <span className="text-white font-bold">{props.physics_result.loading_percent}%</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-cyan-900/40">
+                    <span className="text-slate-400">Current Flow:</span>
+                    <span className="text-cyan-300 font-semibold">{(props.physics_result.current_ka * 1000).toFixed(1)} A</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-cyan-900/40">
+                    <span className="text-slate-400">Derated Ampacity:</span>
+                    <span className="text-slate-300">{(props.physics_result.max_i_ka * 1000).toFixed(1)} A</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-cyan-900/40">
+                    <span className="text-slate-400">Active Technical Loss:</span>
+                    <span className="text-amber-400 font-bold">{props.physics_result.active_loss_kw.toFixed(3)} kW</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-400">Reactive Loss:</span>
+                    <span className="text-slate-300">{props.physics_result.reactive_loss_kvar.toFixed(3)} kVAr</span>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
                 <div className="flex justify-between py-1 border-b border-slate-800/60">
                   <span className="text-slate-400">Conductor:</span>

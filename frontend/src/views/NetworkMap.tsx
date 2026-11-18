@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
+import { PhysicsSimulationBar, PowerFlowSummaryData } from '../components/PhysicsSimulationBar';
+import { ContingencyModal, ContingencyReportData } from '../components/ContingencyModal';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
 
@@ -102,6 +104,108 @@ export const NetworkMap: React.FC = () => {
   const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
   const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
   const [selectedClusterAsset, setSelectedClusterAsset] = useState<SelectedAsset | null>(null);
+
+  // Milestone 5: Physics Simulation Core (TR-PHY)
+  const [powerFlowData, setPowerFlowData] = useState<PowerFlowSummaryData | null>(null);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [heatmapActive, setHeatmapActive] = useState<boolean>(true);
+  const [isContingencyModalOpen, setIsContingencyModalOpen] = useState<boolean>(false);
+  const [contingencyReport, setContingencyReport] = useState<ContingencyReportData | null>(null);
+  const linePolylinesRef = useRef<{ [code: string]: L.Polyline }>({});
+
+  const applyHeatmapStyles = (pfData: PowerFlowSummaryData | null, active: boolean) => {
+    if (!linePolylinesRef.current) return;
+
+    Object.entries(linePolylinesRef.current).forEach(([code, polyline]) => {
+      if (!polyline) return;
+      const isHT = (polyline as any)._isHT;
+      const defaultColor = (polyline as any)._defaultColor;
+      const defaultWeight = (polyline as any)._defaultWeight;
+
+      if (!active || !pfData) {
+        polyline.setStyle({
+          color: defaultColor,
+          weight: defaultWeight,
+          opacity: isHT ? 0.95 : 0.75,
+        });
+        return;
+      }
+
+      const lineRes = pfData.lines.find((l) => l.line_code === code);
+      if (lineRes) {
+        const loading = lineRes.loading_percent;
+        let color = '#10b981'; // <= 80% Normal
+        let weight = isHT ? 4.5 : 3.0;
+        if (loading > 120.0) {
+          color = '#dc2626'; // Emergency
+          weight = isHT ? 6.5 : 5.0;
+        } else if (loading > 100.0) {
+          color = '#ef4444'; // Overload
+          weight = isHT ? 5.5 : 4.0;
+        } else if (loading > 80.0) {
+          color = '#f59e0b'; // Elevated
+          weight = isHT ? 5.0 : 3.5;
+        }
+        polyline.setStyle({ color, weight, opacity: 1.0 });
+      } else {
+        polyline.setStyle({ color: defaultColor, weight: defaultWeight, opacity: 0.5 });
+      }
+    });
+  };
+
+  const handleRunPowerFlow = async (loadMultiplier: number, ambientTempC: number) => {
+    setIsSimulating(true);
+    try {
+      const res = await fetch('/api/v1/physics/power-flow/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feeder_code: selectedFeeder,
+          algorithm: 'nr',
+          load_multiplier: loadMultiplier,
+          ambient_temp_c: ambientTempC,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json();
+        alert(`Power Flow Divergence (HTTP ${res.status}): ${errJson.detail?.message || JSON.stringify(errJson.detail)}`);
+        return;
+      }
+      const pfResult: PowerFlowSummaryData = await res.json();
+      setPowerFlowData(pfResult);
+      applyHeatmapStyles(pfResult, heatmapActive);
+    } catch (err: any) {
+      console.error('Failed to run AC power flow', err);
+      alert(`Simulation error: ${err.message || String(err)}`);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleRunContingency = async () => {
+    setIsSimulating(true);
+    try {
+      const res = await fetch(`/api/v1/physics/contingency/n-1?feeder_code=${selectedFeeder}&ambient_temp_c=35&load_multiplier=1.0`);
+      if (!res.ok) {
+        const errJson = await res.json();
+        alert(`Contingency Screening Error: ${JSON.stringify(errJson)}`);
+        return;
+      }
+      const report: ContingencyReportData = await res.json();
+      setContingencyReport(report);
+      setIsContingencyModalOpen(true);
+    } catch (err: any) {
+      console.error('Failed to run N-1 screening', err);
+      alert(`Contingency screening error: ${err.message || String(err)}`);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleToggleHeatmap = (active: boolean) => {
+    setHeatmapActive(active);
+    applyHeatmapStyles(powerFlowData, active);
+  };
 
   // Layer visibility toggles (matching QGIS layers)
   const [showSubstations, setShowSubstations] = useState<boolean>(true);
@@ -415,6 +519,7 @@ export const NetworkMap: React.FC = () => {
         (polyline as any)._isHT = isHT;
         (polyline as any)._defaultColor = defaultColor;
         (polyline as any)._defaultWeight = defaultWeight;
+        linePolylinesRef.current[lineFeat.properties.code] = polyline;
 
         // Fast Hover Tooltip
         polyline.bindTooltip(
@@ -522,6 +627,7 @@ export const NetworkMap: React.FC = () => {
           const midIdx = Math.floor(rawCoords.length / 2);
           const midPoint = rawCoords[midIdx] || rawCoords[0] || [0, 0];
 
+          const linePhysics = powerFlowData?.lines.find((l) => l.line_code === lineFeat.properties.code);
           const lineAsset: SelectedAsset = {
             id: lineFeat.properties.id,
             code: lineFeat.properties.code,
@@ -532,6 +638,7 @@ export const NetworkMap: React.FC = () => {
             properties: {
               ...lineFeat.properties,
               coordinates: [midPoint[1], midPoint[0]],
+              physics_result: linePhysics,
             },
           };
 
@@ -1119,6 +1226,32 @@ export const NetworkMap: React.FC = () => {
 
       {/* Main Map Canvas Area */}
       <div className="flex-1 relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex">
+        {/* Milestone 5: Floating Physics Simulation HUD Bar */}
+        <PhysicsSimulationBar
+          feederCode={selectedFeeder}
+          isSimulating={isSimulating}
+          powerFlowData={powerFlowData}
+          onRunPowerFlow={handleRunPowerFlow}
+          onOpenContingencyModal={handleRunContingency}
+          heatmapActive={heatmapActive}
+          onToggleHeatmap={handleToggleHeatmap}
+        />
+
+        {/* N-1 Contingency Screening Modal */}
+        <ContingencyModal
+          isOpen={isContingencyModalOpen}
+          onClose={() => setIsContingencyModalOpen(false)}
+          report={contingencyReport}
+          onSelectContingency={(item) => {
+            const polyline = linePolylinesRef.current[item.line_code];
+            if (polyline) {
+              const bounds = polyline.getBounds();
+              mapInstanceRef.current?.fitBounds(bounds, { maxZoom: 18, animate: true });
+              polyline.fire('click');
+            }
+          }}
+        />
+
         {/* Layer Controls Palette (Floating Top Left matching QGIS) */}
         <div className="absolute top-4 left-4 z-[500] bg-slate-900/95 border border-slate-800/80 rounded-xl p-3 shadow-xl backdrop-blur-md space-y-2 text-xs">
           <span className="font-mono text-slate-400 uppercase tracking-wider block mb-1">QGIS Ingested Layers</span>
