@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
+import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
 
@@ -51,6 +52,8 @@ export const NetworkMap: React.FC = () => {
   const [selectedFeeder, setSelectedFeeder] = useState<string>('2011951');
   const [baseMap, setBaseMap] = useState<BaseMapType>('carto-voyager');
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
+  const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
+  const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
 
   // Layer visibility toggles (matching QGIS layers)
   const [showSubstations, setShowSubstations] = useState<boolean>(true);
@@ -707,15 +710,21 @@ export const NetworkMap: React.FC = () => {
         });
 
         marker.on('click', () => {
-          setSelectedAsset({
+          const dtrAsset: SelectedAsset = {
             id: dtrFeat.properties.id,
             code: dtrFeat.properties.code,
             name: dtrFeat.properties.name,
             entity_type: 'distribution_transformer',
             provenance: dtrFeat.properties.provenance,
             confidence_score: dtrFeat.properties.confidence_score,
-            properties: dtrFeat.properties,
-          });
+            properties: {
+              ...dtrFeat.properties,
+              coordinates: [lat, lon],
+            },
+          };
+          setSelectedAsset(dtrAsset);
+          setSelectedDTR(dtrAsset);
+          setIsClusterZoomOpen(true);
         });
 
         dtrs.addLayer(marker);
@@ -977,8 +986,22 @@ export const NetworkMap: React.FC = () => {
           <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#020617' }} />
         </div>
 
+        {/* DTR Local Triangle Cluster Magnifier Window */}
+        <DTRClusterZoomWindow
+          isOpen={isClusterZoomOpen && selectedDTR !== null}
+          onClose={() => setIsClusterZoomOpen(false)}
+          dtr={selectedDTR}
+          networkData={data}
+          baseMap={baseMap}
+          onSelectAsset={(asset) => setSelectedAsset(asset)}
+        />
+
         {/* Slide-in Asset Inspection Drawer */}
-        <AssetInspectionDrawer asset={selectedAsset} onClose={handleCloseDrawer} />
+        <AssetInspectionDrawer
+          asset={selectedAsset}
+          onClose={handleCloseDrawer}
+          onOpenClusterZoom={() => setIsClusterZoomOpen(true)}
+        />
       </div>
     </div>
   );

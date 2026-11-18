@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Zap, Cpu, Gauge, Calculator, ChevronRight, Activity } from 'lucide-react';
+import { X, Zap, Cpu, Gauge, Calculator, ChevronRight, Activity, Maximize2 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
 
@@ -17,9 +17,10 @@ export interface SelectedAsset {
 interface AssetInspectionDrawerProps {
   asset: SelectedAsset | null;
   onClose: () => void;
+  onOpenClusterZoom?: () => void;
 }
 
-export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ asset, onClose }) => {
+export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ asset, onClose, onOpenClusterZoom }) => {
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
 
   if (!asset) return null;
@@ -304,6 +305,20 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Open DTR Cluster Magnifier Window */}
+          {asset.entity_type === 'distribution_transformer' && onOpenClusterZoom && (
+            <button
+              onClick={onOpenClusterZoom}
+              className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-pink-950/60 to-purple-950/60 hover:from-pink-900/70 hover:to-purple-900/70 border border-pink-700/60 rounded-xl text-pink-200 hover:text-white transition-all text-xs font-semibold group shadow-lg"
+            >
+              <div className="flex items-center space-x-2">
+                <Maximize2 className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span>View Triangle Cluster Magnifier (19.5x)</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-pink-400" />
+            </button>
           )}
 
           {/* Inspect Calculations CTA (Principle A4-8) */}

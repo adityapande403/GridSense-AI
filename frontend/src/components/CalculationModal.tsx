@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, BookOpen, Calculator, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 export interface CalculationDetails {
   title: string;
@@ -24,6 +26,19 @@ interface CalculationModalProps {
 
 export const CalculationModal: React.FC<CalculationModalProps> = ({ isOpen, onClose, details }) => {
   if (!isOpen || !details) return null;
+
+  const renderedFormulaHtml = useMemo(() => {
+    if (!details.latexFormula) return null;
+    try {
+      return katex.renderToString(details.latexFormula, {
+        throwOnError: false,
+        displayMode: true,
+      });
+    } catch (e) {
+      console.error('KaTeX rendering error:', e);
+      return null;
+    }
+  }, [details.latexFormula]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -68,9 +83,16 @@ export const CalculationModal: React.FC<CalculationModalProps> = ({ isOpen, onCl
               <BookOpen className="w-3.5 h-3.5" />
               <span>Governing Formulation</span>
             </span>
-            <div className="p-3 bg-slate-900/90 rounded-lg text-center font-mono text-cyan-300 text-sm tracking-wide border border-slate-800">
-              {details.latexFormula || details.formula}
-            </div>
+            {renderedFormulaHtml ? (
+              <div
+                className="p-4 bg-slate-900/95 rounded-lg text-center text-cyan-200 text-base tracking-wide border border-slate-800 overflow-x-auto shadow-inner"
+                dangerouslySetInnerHTML={{ __html: renderedFormulaHtml }}
+              />
+            ) : (
+              <div className="p-3 bg-slate-900/90 rounded-lg text-center font-mono text-cyan-300 text-sm tracking-wide border border-slate-800">
+                {details.formula}
+              </div>
+            )}
             <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">{details.description}</p>
           </div>
 
