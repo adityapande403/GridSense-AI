@@ -34,95 +34,84 @@ export const App: React.FC = () => {
         activeTab === 'map' ? 'h-screen overflow-hidden' : 'min-h-screen'
       }`}
     >
-      {/* Top Advisory Banner */}
+      {/* Unified Slim App Navigation Header (Single 44px Row) */}
       {showTopBars && (
-        <div className="bg-amber-950/80 border-b border-amber-600/40 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
-            <span className="font-semibold tracking-wide">ADVISORY-ONLY PLATFORM:</span>
-            <span className="text-amber-300/90">
-              No direct SCADA actuation. Recommendations require operator engineering sign-off.
-            </span>
-          </div>
-          <div className="flex items-center space-x-3 text-xs">
-            <span>Target: <strong>TSSPDCL / TSNPDCL</strong></span>
-            <span className="text-amber-500">•</span>
-            <span>TISC 2026 Challenge 08</span>
-          </div>
-        </div>
-      )}
-
-      {/* Primary Header */}
-      {showTopBars && (
-        <header className="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold">
-              <Zap className="w-6 h-6 text-blue-400" />
+        <header className="bg-slate-900 border-b border-slate-800 px-4 h-11 flex items-center justify-between shrink-0 select-none z-30">
+          {/* Brand & Advisory Badge */}
+          <div className="flex items-center space-x-2.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold shrink-0">
+              <Zap className="w-4 h-4 text-blue-400" />
             </div>
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-xl font-bold tracking-tight text-white">GridSense-AI</h1>
-                <span className="text-xs font-mono bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded">
-                  v0.1.0-M1
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Distribution Network Sectionalizing, Load Switching & CAPEX Intelligence
-              </p>
-            </div>
-          </div>
-
-          {/* System Telemetry & Status Indicator */}
-          <div className="flex items-center space-x-6 text-sm">
-            <div className="flex items-center space-x-2">
-              <Database className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-400">PostGIS Engine:</span>
-              <span
-                className={`text-xs font-mono font-medium ${
-                  health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
-                }`}
-              >
-                {health?.database_connected ? `ONLINE (${health.tables_count} Tables)` : 'CONNECTING...'}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm font-bold tracking-tight text-white">GridSense-AI</span>
+              <span className="text-[10px] font-mono bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.2 rounded">
+                v0.1
               </span>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Cpu className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-400">Physics Core:</span>
-              <span className="text-xs font-mono text-cyan-400">pandapower AC Newton-Raphson</span>
+            {/* Advisory Pill with Tooltip */}
+            <div
+              className="hidden sm:flex items-center space-x-1 text-[10px] font-mono bg-amber-950/70 border border-amber-600/50 text-amber-300 px-2 py-0.5 rounded cursor-help"
+              title="ADVISORY-ONLY PLATFORM: No direct SCADA actuation. Recommendations require operator engineering sign-off. Target: TSSPDCL / TSNPDCL • TISC 2026 Challenge 08"
+            >
+              <ShieldAlert className="w-3 h-3 text-amber-400" />
+              <span className="font-semibold">ADVISORY ONLY</span>
+            </div>
+          </div>
+
+          {/* Navigation Tabs (Centered Inline) */}
+          <nav className="flex items-center space-x-1">
+            {[
+              { id: 'overview', label: 'Executive Overview', icon: Activity },
+              { id: 'map', label: 'Network Digital Twin', icon: Compass },
+              { id: 'switching', label: 'Switching & FLISR', icon: Zap },
+              { id: 'capex', label: 'CAPEX Intelligence', icon: TrendingUp },
+              { id: 'scenarios', label: 'Scenario Simulator', icon: GitBranch },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white font-semibold shadow'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Telemetry Status Indicators */}
+          <div className="flex items-center space-x-2 text-xs font-mono">
+            <div
+              className="flex items-center space-x-1.5 bg-slate-950/80 border border-slate-800 px-2 py-0.5 rounded-lg text-[11px]"
+              title="PostGIS Spatial Database Status"
+            >
+              <Database className="w-3 h-3 text-slate-400" />
+              <span
+                className={`font-medium ${
+                  health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                {health?.database_connected ? `DB: ${health.tables_count} tbls` : 'DB: ...'}
+              </span>
+            </div>
+
+            <div
+              className="hidden xl:flex items-center space-x-1.5 bg-slate-950/80 border border-slate-800 px-2 py-0.5 rounded-lg text-[11px]"
+              title="Physics Core Solver"
+            >
+              <Cpu className="w-3 h-3 text-slate-400" />
+              <span className="text-cyan-400 font-medium">pandapower NR</span>
             </div>
           </div>
         </header>
-      )}
-
-      {/* Navigation Tabs (Tier 1 Screens) */}
-      {showTopBars && (
-        <nav className="bg-slate-900/60 border-b border-slate-800 px-6 flex space-x-1">
-          {[
-            { id: 'overview', label: 'Executive Overview', icon: Activity },
-            { id: 'map', label: 'Network Digital Twin (Map SLD)', icon: Compass },
-            { id: 'switching', label: 'Switching & FLISR Workbench', icon: Zap },
-            { id: 'capex', label: 'CAPEX Intelligence', icon: TrendingUp },
-            { id: 'scenarios', label: 'Scenario Simulator', icon: GitBranch },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center space-x-2 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-blue-500 text-blue-400 bg-blue-500/10'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
       )}
 
       {/* Main Workspace Body */}
