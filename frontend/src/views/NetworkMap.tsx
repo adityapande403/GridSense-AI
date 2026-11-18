@@ -262,14 +262,26 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
   // 1. Initialize Leaflet Map
   useEffect(() => {
-    if (!mapContainerRef.current || mapInstanceRef.current) return;
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
 
-    // Default center at Puthiya Kadavu (Kozhikode, Kerala)
-    const map = L.map(mapContainerRef.current, {
-      zoomControl: false,
-      minZoom: 3,
-      maxZoom: 22,
-    }).setView([11.2687, 75.7665], 16);
+    // Clean up any stale leaflet ID to prevent "Map container is already initialized" crash during HMR/StrictMode
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
+
+    let map: L.Map;
+    try {
+      // Default center at Puthiya Kadavu (Kozhikode, Kerala)
+      map = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        minZoom: 3,
+        maxZoom: 22,
+      }).setView([11.2687, 75.7665], 16);
+    } catch (err) {
+      console.error('Error initializing Leaflet map:', err);
+      return;
+    }
 
     // Initial tile layer: Carto Voyager High-DPI (@2x) raster tiles with user's API key
     const tileLayer = L.tileLayer(
@@ -343,8 +355,17 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
     return () => {
       clearTimeout(timer);
-      map.remove();
-      mapInstanceRef.current = null;
+      try {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+      } catch (e) {
+        console.warn('Leaflet cleanup warning:', e);
+      }
+      if (mapContainerRef.current) {
+        delete (mapContainerRef.current as any)._leaflet_id;
+      }
     };
   }, []);
 
@@ -1172,32 +1193,36 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-slate-950 select-none">
-      {/* 1. Giant Full-Bleed Map Canvas Background */}
-      <div className="absolute inset-0 w-full h-full z-0">
-        {loading && (
-          <div className="absolute inset-0 z-[600] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center space-x-3 text-slate-300 text-sm">
-            <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
-            <span className="font-mono">Rendering 100% Complete Distribution Network...</span>
-          </div>
-        )}
-        {error && (
-          <div className="absolute inset-0 z-[600] bg-slate-950/80 flex items-center justify-center space-x-3 text-rose-400 text-sm">
-            <AlertTriangle className="w-5 h-5" />
-            <span>{error}</span>
-          </div>
-        )}
-        <div
-          ref={mapContainerRef}
-          className="w-full h-full transition-colors duration-200 cursor-grab active:cursor-grabbing"
-          style={{
-            background:
-              baseMap === 'carto-voyager' || baseMap === 'osm'
-                ? '#e2e8f0'
-                : '#020617',
-          }}
-        />
-      </div>
+    <div
+      className={`relative w-full ${
+        isFullscreen ? 'h-screen' : 'h-[calc(100vh-7.5rem)]'
+      } min-h-[500px] overflow-hidden bg-slate-950 select-none`}
+    >
+      {/* 1. Giant Full-Bleed Leaflet Map Canvas Background */}
+      <div
+        ref={mapContainerRef}
+        id="network-leaflet-map"
+        className="absolute inset-0 w-full h-full z-0 transition-colors duration-200 cursor-grab active:cursor-grabbing"
+        style={{
+          background:
+            baseMap === 'carto-voyager' || baseMap === 'osm'
+              ? '#e2e8f0'
+              : '#020617',
+        }}
+      />
+
+      {loading && (
+        <div className="absolute inset-0 z-[600] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center space-x-3 text-slate-300 text-sm pointer-events-none">
+          <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
+          <span className="font-mono">Rendering 100% Complete Distribution Network...</span>
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 z-[600] bg-slate-950/80 flex items-center justify-center space-x-3 text-rose-400 text-sm">
+          <AlertTriangle className="w-5 h-5" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* 2. Top Floating Header HUD */}
       <div className="absolute top-3 left-3 right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex flex-wrap items-center justify-between gap-3 text-xs">

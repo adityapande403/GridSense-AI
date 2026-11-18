@@ -16,7 +16,7 @@ interface SystemHealth {
 
 export const App: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>('map');
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -29,7 +29,11 @@ export const App: React.FC = () => {
   const showTopBars = !isMapFullscreen || activeTab !== 'map';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden">
+    <div
+      className={`bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden ${
+        activeTab === 'map' ? 'h-screen overflow-hidden' : 'min-h-screen'
+      }`}
+    >
       {/* Top Advisory Banner */}
       {showTopBars && (
         <div className="bg-amber-950/80 border-b border-amber-600/40 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-between">
