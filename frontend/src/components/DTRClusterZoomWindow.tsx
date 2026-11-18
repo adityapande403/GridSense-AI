@@ -13,6 +13,11 @@ interface DTRClusterZoomWindowProps {
   networkData: any;
   baseMap: 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
   isDrawerOpen?: boolean;
+  showHTLines?: boolean;
+  showLTLines?: boolean;
+  showPoles?: boolean;
+  showDTRs?: boolean;
+  selectedAsset?: SelectedAsset | null;
   onSelectAsset?: (asset: SelectedAsset) => void;
 }
 
@@ -23,10 +28,22 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   networkData,
   baseMap,
   isDrawerOpen = true,
+  showHTLines = true,
+  showLTLines = true,
+  showPoles = true,
+  showDTRs = true,
+  selectedAsset,
   onSelectAsset,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [currentZoom, setCurrentZoom] = useState<number>(21.5);
+
+  // Local attribute/layer visibility toggles (initialized from parent props)
+  const [showHT, setShowHT] = useState<boolean>(showHTLines);
+  const [showLT, setShowLT] = useState<boolean>(showLTLines);
+  const [showPolesLayer, setShowPolesLayer] = useState<boolean>(showPoles);
+  const [showDTRLayer, setShowDTRLayer] = useState<boolean>(showDTRs);
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -35,6 +52,20 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     poles: L.LayerGroup;
     dtr: L.LayerGroup;
   } | null>(null);
+
+  // Sync with parent props when changed globally
+  useEffect(() => {
+    setShowHT(showHTLines);
+  }, [showHTLines]);
+  useEffect(() => {
+    setShowLT(showLTLines);
+  }, [showLTLines]);
+  useEffect(() => {
+    setShowPolesLayer(showPoles);
+  }, [showPoles]);
+  useEffect(() => {
+    setShowDTRLayer(showDTRs);
+  }, [showDTRs]);
 
   // Extract DTR Coordinates
   const getDTRCoords = (): [number, number] | null => {
@@ -46,7 +77,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     if (props.latitude && props.longitude) {
       return [Number(props.latitude), Number(props.longitude)];
     }
-    return [11.270127, 75.765721]; // fallback Beach 2
+    return [11.270127, 75.765721];
   };
 
   const dtrCoords = getDTRCoords();
@@ -88,7 +119,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         maxZoom: 24, // Allow ultra high zoom
       }).setView(center, 21.5);
 
-      // Base tile layer with maxNativeZoom: 19 so Leaflet overscales raster tiles smoothly up to zoom 24
       let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
       if (baseMap === 'carto-dark') {
         tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
@@ -138,9 +168,31 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     };
   }, []);
 
-  // 2. Render Cluster Features (DTR, Surrounding Triangle Poles, Branch Lines)
+  // 2. Base Map Tile Layer Switch
   useEffect(() => {
-    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !dtrCoords || !networkData) return;
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+
+    let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+    if (baseMap === 'carto-dark') {
+      tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+    } else if (baseMap === 'osm') {
+      tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    } else if (baseMap === 'satellite') {
+      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    }
+
+    const newTileLayer = L.tileLayer(tileUrl, {
+      maxNativeZoom: 19,
+      maxZoom: 24,
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newTileLayer;
+  }, [baseMap]);
+
+  // 3. Render Cluster Features with Functional Attribute Selection & Highlighting
+  useEffect(() => {
+    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !dtrCoords || !networkData || !dtr) return;
 
     const [dtrLat, dtrLon] = dtrCoords;
     const { lines, poles, dtr: dtrGroup } = clusterLayersRef.current;
@@ -173,17 +225,21 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       return false;
     });
 
-    // C. Render Connecting Lines in Cluster with Enhanced Visibility
+    // C. Render Lines (respecting showHT and showLT attribute toggles)
     clusterLines.forEach((lineFeat: any) => {
       const coords = lineFeat.geometry?.coordinates;
       if (!coords || coords.length < 2) return;
 
       const isHT = lineFeat.properties.is_ht !== false;
+      if (isHT && !showHT) return;
+      if (!isHT && !showLT) return;
+
       const latlngs = coords.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+      const isSelected = selectedAsset?.code === lineFeat.properties.code;
 
       const polyline = L.polyline(latlngs, {
-        color: isHT ? '#ef4444' : '#0ea5e9',
-        weight: isHT ? 6.5 : 4.5,
+        color: isSelected ? '#38bdf8' : isHT ? '#ef4444' : '#0ea5e9',
+        weight: isSelected ? 8.0 : isHT ? 6.5 : 4.5,
         opacity: isHT ? 1.0 : 0.9,
         dashArray: lineFeat.properties.is_operational !== false ? undefined : '5, 5',
         lineCap: 'round',
@@ -192,17 +248,39 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       const lengthMeters = (lineFeat.properties.length_km * 1000).toFixed(0);
 
+      // Fast hover tooltip
       polyline.bindTooltip(
         `
         <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
           <div style="font-weight: bold; color: ${isHT ? '#ef4444' : '#38bdf8'};">${isHT ? '11 kV Primary Incomer' : '415 V LT Circuit Cable'}</div>
           <div>Conductor: <b>${lineFeat.properties.conductor_type}</b></div>
           <div>Span: <b>${lengthMeters} m</b> &bull; Load: <b>${lineFeat.properties.loading_pct}%</b></div>
+          <div style="font-size: 9px; color: #38bdf8; margin-top: 2px;">Click to select & inspect attributes</div>
         </div>
         `,
         { sticky: true, opacity: 0.95 }
       );
 
+      // Persistent click popup with attribute selection
+      const linePopupHtml = `
+        <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+          <div style="font-size: 10px; font-weight: 700; color: ${isHT ? '#ef4444' : '#38bdf8'}; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
+            ${isHT ? '11 kV Primary Incomer' : '415 V LT Cable'}
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${lineFeat.properties.code}</div>
+          <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
+            <div>Conductor: <b>${lineFeat.properties.conductor_type}</b></div>
+            <div>Length: <b>${lengthMeters} meters</b></div>
+            <div>Loading: <b>${lineFeat.properties.loading_pct}%</b></div>
+            <div>Status: <b style="color: ${lineFeat.properties.is_operational !== false ? '#34d399' : '#f87171'}">${lineFeat.properties.is_operational !== false ? 'Energized' : 'De-energized'}</b></div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 4px;">From: ${lineFeat.properties.from_bus_code} &rarr; To: ${lineFeat.properties.to_bus_code}</div>
+          </div>
+        </div>
+      `;
+
+      polyline.bindPopup(linePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
+
+      // Click to select attribute
       polyline.on('click', () => {
         if (onSelectAsset) {
           onSelectAsset({
@@ -220,89 +298,128 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       lines.addLayer(polyline);
     });
 
-    // D. Render Cluster Poles with Permanent Text Badges for Immediate Visibility
-    clusterPoles.forEach((poleFeat: any) => {
-      const coords = poleFeat.geometry?.coordinates;
-      if (!coords) return;
-      const pLat = coords[1];
-      const pLon = coords[0];
-      const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
-      const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
-      const isDP = shortCode === 'DP-Structure';
+    // D. Render Cluster Poles (respecting showPolesLayer attribute toggle)
+    if (showPolesLayer) {
+      clusterPoles.forEach((poleFeat: any) => {
+        const coords = poleFeat.geometry?.coordinates;
+        if (!coords) return;
+        const pLat = coords[1];
+        const pLon = coords[0];
+        const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
+        const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
+        const isDP = shortCode === 'DP-Structure';
+        const isSelected = selectedAsset?.code === poleFeat.properties.code;
 
-      const poleBadgeIcon = L.divIcon({
-        className: 'cluster-pole-badge-icon',
+        const poleBadgeIcon = L.divIcon({
+          className: 'cluster-pole-badge-icon',
+          html: `
+            <div style="display: flex; align-items: center; gap: 4px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
+              <div style="width: ${isDP ? '15px' : '12px'}; height: ${isDP ? '15px' : '12px'}; border-radius: 50%; background: ${
+            isSelected ? '#38bdf8' : isDP ? '#ea580c' : '#854d0e'
+          }; border: 2.5px solid ${isSelected ? '#ffffff' : isDP ? '#f97316' : '#fde047'}; box-shadow: 0 0 12px ${
+            isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
+          };"></div>
+              <span style="background: ${
+                isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(15, 23, 42, 0.92)'
+              }; color: ${isSelected ? '#ffffff' : isDP ? '#fdba74' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${
+            isSelected ? '#38bdf8' : isDP ? '#ea580c' : '#78350f'
+          }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
+                ${shortCode} (${distM}m)
+              </span>
+            </div>
+          `,
+          iconSize: [90, 20],
+          iconAnchor: [6, 6],
+        });
+
+        const marker = L.marker([pLat, pLon], { icon: poleBadgeIcon });
+
+        const polePopupHtml = `
+          <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #f59e0b; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
+              Support Structure
+            </div>
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
+            <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
+              <div>Asset Code: <b>${poleFeat.properties.code}</b></div>
+              <div>Distance from DTR: <b>${distM} m</b></div>
+              <div>Operating Voltage: <b>${poleFeat.properties.voltage_level_kv || 0.415} kV</b></div>
+              <div>Provenance: <b style="color: #38bdf8">${poleFeat.properties.provenance}</b></div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(polePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
+
+        // Click to select attribute
+        marker.on('click', () => {
+          if (onSelectAsset) {
+            onSelectAsset({
+              id: poleFeat.properties.id,
+              code: poleFeat.properties.code,
+              name: poleFeat.properties.name,
+              entity_type: 'pole',
+              provenance: poleFeat.properties.provenance,
+              confidence_score: poleFeat.properties.confidence_score,
+              properties: poleFeat.properties,
+            });
+          }
+        });
+
+        poles.addLayer(marker);
+      });
+    }
+
+    // E. Render Central DTR Beacon (respecting showDTRLayer attribute toggle)
+    if (showDTRLayer) {
+      const isDTRSelected = selectedAsset?.code === dtr.code;
+      const dtrIcon = L.divIcon({
+        className: 'cluster-dtr-center-icon',
         html: `
-          <div style="display: flex; align-items: center; gap: 4px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
-            <div style="width: ${isDP ? '14px' : '11px'}; height: ${isDP ? '14px' : '11px'}; border-radius: 50%; background: ${isDP ? '#ea580c' : '#854d0e'}; border: 2.5px solid ${isDP ? '#f97316' : '#fde047'}; box-shadow: 0 0 10px rgba(0,0,0,0.8);"></div>
-            <span style="background: rgba(15, 23, 42, 0.92); color: ${isDP ? '#fdba74' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${isDP ? '#ea580c' : '#78350f'}; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
-              ${shortCode} (${distM}m)
-            </span>
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; cursor: pointer;">
+            <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(236, 72, 153, ${
+              isDTRSelected ? '0.6' : '0.4'
+            }); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 26px; height: 26px; border-radius: 50%; background: #ec4899; border: 3.5px solid ${
+              isDTRSelected ? '#38bdf8' : '#ffffff'
+            }; box-shadow: 0 0 20px #ec4899; display: flex; align-items: center; justify-content: center; z-index: 10;">
+              <div style="width: 7px; height: 7px; border-radius: 50%; background: #ffffff;"></div>
+            </div>
           </div>
         `,
-        iconSize: [90, 20],
-        iconAnchor: [6, 6],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
-      const marker = L.marker([pLat, pLon], { icon: poleBadgeIcon });
+      const dtrMarker = L.marker([dtrLat, dtrLon], { icon: dtrIcon });
 
-      marker.bindTooltip(
-        `
-        <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #78350f;">
-          <div style="font-weight: bold; color: #fde047;">${poleFeat.properties.name || poleFeat.properties.code}</div>
-          <div>Asset Code: <b>${poleFeat.properties.code}</b></div>
-          <div>Distance from DTR: <b>${distM} m</b></div>
-          <div>Operating Voltage: ${poleFeat.properties.voltage_level_kv || 0.415} kV</div>
+      const dtrPopupHtml = `
+        <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 260px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+          <div style="font-size: 10px; font-weight: 700; color: #ec4899; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
+            Distribution Transformer (Center)
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${dtr.name || dtr.code}</div>
+          <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
+            <div>Rating: <b>${dtr.properties?.rated_kva || 100} kVA</b></div>
+            <div>Loading: <b>${dtr.properties?.loading_pct || 72}%</b></div>
+            <div>Primary: 11 kV &bull; Secondary: 415 V Stepdown</div>
+            <div>Provenance: <b style="color: #38bdf8">${dtr.provenance}</b></div>
+          </div>
         </div>
-        `,
-        { direction: 'top', offset: [0, -8], opacity: 1 }
-      );
+      `;
 
-      marker.on('click', () => {
+      dtrMarker.bindPopup(dtrPopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
+
+      // Click to select attribute
+      dtrMarker.on('click', () => {
         if (onSelectAsset) {
-          onSelectAsset({
-            id: poleFeat.properties.id,
-            code: poleFeat.properties.code,
-            name: poleFeat.properties.name,
-            entity_type: 'pole',
-            provenance: poleFeat.properties.provenance,
-            confidence_score: poleFeat.properties.confidence_score,
-            properties: poleFeat.properties,
-          });
+          onSelectAsset(dtr);
         }
       });
 
-      poles.addLayer(marker);
-    });
-
-    // E. Render Central DTR Beacon
-    const dtrIcon = L.divIcon({
-      className: 'cluster-dtr-center-icon',
-      html: `
-        <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; cursor: pointer;">
-          <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(236, 72, 153, 0.4); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-          <div style="width: 26px; height: 26px; border-radius: 50%; background: #ec4899; border: 3.5px solid #ffffff; box-shadow: 0 0 20px #ec4899; display: flex; align-items: center; justify-content: center; z-index: 10;">
-            <div style="width: 7px; height: 7px; border-radius: 50%; background: #ffffff;"></div>
-          </div>
-        </div>
-      `,
-      iconSize: [48, 48],
-      iconAnchor: [24, 24],
-    });
-
-    const dtrMarker = L.marker([dtrLat, dtrLon], { icon: dtrIcon });
-    dtrMarker.bindTooltip(
-      `
-      <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #ec4899; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-        <div style="font-weight: bold; color: #f472b6;">${dtr?.name || dtr?.code}</div>
-        <div>Rating: <b>${dtr?.properties?.rated_kva || 100} kVA</b></div>
-        <div>Cluster Center: 11 kV &rarr; 415 V Stepdown</div>
-      </div>
-      `,
-      { direction: 'top', offset: [0, -20], opacity: 1 }
-    );
-    dtrGroup.addLayer(dtrMarker);
-  }, [isOpen, dtrCoords?.[0], dtrCoords?.[1], networkData, baseMap]);
+      dtrGroup.addLayer(dtrMarker);
+    }
+  }, [isOpen, dtrCoords?.[0], dtrCoords?.[1], networkData, baseMap, showHT, showLT, showPolesLayer, showDTRLayer, selectedAsset?.code]);
 
   if (!isOpen || !dtr) return null;
 
@@ -317,8 +434,8 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         isExpanded
           ? 'inset-6 z-[2500]'
           : isDrawerOpen
-          ? 'bottom-6 right-[404px] w-[500px] h-[480px] z-[1500]'
-          : 'bottom-6 right-6 w-[500px] h-[480px] z-[1500]'
+          ? 'bottom-6 right-[404px] w-[520px] h-[490px] z-[1500]'
+          : 'bottom-6 right-6 w-[520px] h-[490px] z-[1500]'
       } bg-slate-900/98 border border-pink-500/50 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
     >
       {/* Header Bar */}
@@ -411,25 +528,67 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         </div>
       </div>
 
+      {/* Layer/Attribute Visibility Toolbar within Zoom Window */}
+      <div className="px-4 py-1.5 bg-slate-950/70 border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
+        <div className="flex items-center space-x-1.5">
+          <span className="text-slate-500 uppercase text-[9px] mr-1">Layer Attributes:</span>
+          <button
+            onClick={() => setShowHT(!showHT)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showHT
+                ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle 11 kV HT Incomer Lines"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <span>11kV HT</span>
+          </button>
+          <button
+            onClick={() => setShowLT(!showLT)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showLT
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle 415 V LT Circuit Lines"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <span>415V LT</span>
+          </button>
+          <button
+            onClick={() => setShowPolesLayer(!showPolesLayer)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showPolesLayer
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle Support Poles & DP Structure"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span>Poles</span>
+          </button>
+          <button
+            onClick={() => setShowDTRLayer(!showDTRLayer)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showDTRLayer
+                ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle Central DTR Station"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+            <span>DTR Center</span>
+          </button>
+        </div>
+        <div className="text-[10px] text-slate-500">
+          Selected: <b className="text-cyan-300">{selectedAsset?.name || selectedAsset?.code || 'None'}</b>
+        </div>
+      </div>
+
       {/* Interactive High-Res Mini-Map Canvas */}
       <div className="flex-1 relative w-full h-full bg-slate-950">
         <div ref={mapContainerRef} className="w-full h-full" />
-
-        {/* Map Cluster Legend Overlay */}
-        <div className="absolute top-2.5 left-2.5 z-[1000] bg-slate-950/85 border border-slate-800/80 rounded-lg p-2 text-[10px] font-mono space-y-1 shadow-lg backdrop-blur-sm pointer-events-none">
-          <div className="flex items-center space-x-1.5 text-rose-300">
-            <span className="w-2.5 h-1 bg-red-500 rounded-sm inline-block" />
-            <span>11 kV HT Incomer</span>
-          </div>
-          <div className="flex items-center space-x-1.5 text-cyan-300">
-            <span className="w-2.5 h-0.5 bg-cyan-400 inline-block" />
-            <span>415 V LT Circuit Cables</span>
-          </div>
-          <div className="flex items-center space-x-1.5 text-amber-300">
-            <span className="w-2 h-2 rounded-full bg-amber-600 border border-yellow-300 inline-block" />
-            <span>Poles & DP Structure (with distance)</span>
-          </div>
-        </div>
       </div>
 
       {/* Cluster Summary Footer Bar */}
@@ -444,12 +603,12 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             {loadingPct}% {isOverloaded ? '(Overloaded)' : '(Optimal)'}
           </span>
           <span className="text-slate-600">&bull;</span>
-          <span className="text-slate-400">Delta Bus:</span>
+          <span className="text-slate-400">Stepdown:</span>
           <span className="text-cyan-400 font-semibold">11 kV &rarr; 415 V</span>
         </div>
-        <div className="text-[10px] text-slate-500 flex items-center space-x-1">
-          <Info className="w-3 h-3 text-slate-400" />
-          <span>Click any line/pole in cluster to inspect</span>
+        <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+          <Info className="w-3 h-3 text-cyan-400" />
+          <span>Click any line, pole, or DTR to inspect attributes</span>
         </div>
       </div>
     </div>

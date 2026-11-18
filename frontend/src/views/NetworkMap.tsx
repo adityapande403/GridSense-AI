@@ -995,6 +995,11 @@ export const NetworkMap: React.FC = () => {
           networkData={data}
           baseMap={baseMap}
           isDrawerOpen={selectedAsset !== null}
+          showHTLines={showHTLines}
+          showLTLines={showLTLines}
+          showPoles={showPoles}
+          showDTRs={showDTRs}
+          selectedAsset={selectedAsset}
           onSelectAsset={(asset) => setSelectedAsset(asset)}
         />
 
@@ -1002,7 +1007,6 @@ export const NetworkMap: React.FC = () => {
         <AssetInspectionDrawer
           asset={selectedAsset}
           onClose={handleCloseDrawer}
-          onOpenClusterZoom={() => setIsClusterZoomOpen(true)}
         />
       </div>
     </div>
