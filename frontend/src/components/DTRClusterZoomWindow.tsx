@@ -183,6 +183,35 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     return code.length > 10 ? code.slice(-6) : code;
   };
 
+  // Helper to compute non-colliding badge placement quadrant for dense neighbor poles
+  const getBadgeQuadrant = (
+    lat: number,
+    lon: number,
+    allPoles: any[],
+    idx: number
+  ): 'right' | 'left' | 'top' | 'bottom' => {
+    // Find all poles within 8.5 meters
+    const closePoles = allPoles.filter((other) => {
+      const oc = other.geometry?.coordinates;
+      if (!oc) return false;
+      return getDistanceMeters(lat, lon, oc[1], oc[0]) <= 8.5;
+    });
+
+    if (closePoles.length <= 1) {
+      return 'right';
+    }
+
+    // Sort deterministic by code
+    closePoles.sort((a, b) => (a.properties?.code || '').localeCompare(b.properties?.code || ''));
+    const pos = closePoles.findIndex((n) => {
+      const nc = n.geometry?.coordinates;
+      return nc && Math.abs(nc[1] - lat) < 0.00005 && Math.abs(nc[0] - lon) < 0.00005;
+    });
+
+    const quadrantOrder: Array<'right' | 'left' | 'top' | 'bottom'> = ['right', 'left', 'top', 'bottom'];
+    return quadrantOrder[(pos >= 0 ? pos : idx) % 4];
+  };
+
   // Dynamic entity styling helpers
   const getEntityColors = () => {
     const type = targetAsset?.entity_type;
@@ -411,7 +440,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     tileLayerRef.current = newTileLayer;
   }, [baseMap]);
 
-  // 3. Render Cluster Features for ALL Network Attributes
+  // 3. Render Cluster Features for ALL Network Attributes with Anti-Collision Radial Fanning
   useEffect(() => {
     if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !centerCoords || !networkData || !targetAsset)
       return;
@@ -527,7 +556,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
     // D1. Render DP STRUCTURES (Substation Double-Pole Mounting Structure)
     if (showDP) {
-      dpPolesList.forEach((poleFeat: any) => {
+      dpPolesList.forEach((poleFeat: any, pIdx: number) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
         const origLat = coords[1];
@@ -563,28 +592,47 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           dpStructures.addLayer(spiderLine);
         }
 
+        // Multi-directional badge placement to completely prevent overlapping boxes
+        const quadrant = getBadgeQuadrant(pLat, pLon, clusterPoles, pIdx);
+        let flexClass = 'display: flex; align-items: center; gap: 4px;';
+        let iconAnchor: [number, number] = [8, 10];
+        let iconSize: [number, number] = [115, 24];
+
+        if (quadrant === 'left') {
+          flexClass = 'display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;';
+          iconAnchor = [107, 10];
+        } else if (quadrant === 'top') {
+          flexClass = 'display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;';
+          iconAnchor = [57, 32];
+          iconSize = [115, 38];
+        } else if (quadrant === 'bottom') {
+          flexClass = 'display: flex; flex-direction: column; align-items: center; gap: 3px;';
+          iconAnchor = [57, 6];
+          iconSize = [115, 38];
+        }
+
         const dpBadgeIcon = L.divIcon({
           className: 'cluster-dp-badge-icon',
           html: `
-            <div style="display: flex; align-items: center; gap: 5px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
-              <div style="width: 18px; height: 18px; border-radius: 4px; background: ${
+            <div style="${flexClass} pointer-events: auto; cursor: pointer; white-space: nowrap;">
+              <div style="width: 16px; height: 16px; border-radius: 4px; background: ${
                 isSelected ? '#38bdf8' : '#ea580c'
-              }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fed7aa'}; box-shadow: 0 0 14px ${
+              }; border: 2px solid ${isSelected ? '#ffffff' : '#fed7aa'}; box-shadow: 0 0 12px ${
             isSelected ? '#38bdf8' : '#ea580c'
-          }; display: flex; align-items: center; justify-content: center;">
-                <div style="width: 5px; height: 5px; background: #ffffff; border-radius: 50%;"></div>
+          }; display: flex; align-items: center; justify-content: center; shrink-0;">
+                <div style="width: 4px; height: 4px; background: #ffffff; border-radius: 50%;"></div>
               </div>
               <span style="background: ${
                 isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(124, 45, 18, 0.92)'
-              }; color: ${isSelected ? '#ffffff' : '#fed7aa'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1.5px solid ${
+              }; color: ${isSelected ? '#ffffff' : '#fed7aa'}; font-family: ui-monospace, monospace; font-size: 9.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 4px; border: 1px solid ${
             isSelected ? '#38bdf8' : '#ea580c'
-          }; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">
-                ${shortCode} (${distM}m)
+          }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
+                ${shortCode} <span style="opacity: 0.8; font-size: 8.5px;">(${distM}m)</span>
               </span>
             </div>
           `,
-          iconSize: [120, 24],
-          iconAnchor: [9, 9],
+          iconSize: iconSize,
+          iconAnchor: iconAnchor,
         });
 
         const marker = L.marker([pLat, pLon], { icon: dpBadgeIcon });
@@ -612,9 +660,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       });
     }
 
-    // D2. Render STANDARD DISTRIBUTION SUPPORT POLES
+    // D2. Render STANDARD DISTRIBUTION SUPPORT POLES with Multi-directional Radial Fanning
     if (showPolesLayer) {
-      stdPolesList.forEach((poleFeat: any) => {
+      stdPolesList.forEach((poleFeat: any, pIdx: number) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
         const origLat = coords[1];
@@ -650,26 +698,45 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           poles.addLayer(spiderLine);
         }
 
+        // Multi-directional badge placement: East, West, North, or South based on local density
+        const quadrant = getBadgeQuadrant(pLat, pLon, clusterPoles, pIdx);
+        let flexClass = 'display: flex; align-items: center; gap: 3px;';
+        let iconAnchor: [number, number] = [6, 8];
+        let iconSize: [number, number] = [100, 20];
+
+        if (quadrant === 'left') {
+          flexClass = 'display: flex; flex-direction: row-reverse; align-items: center; gap: 3px;';
+          iconAnchor = [94, 8];
+        } else if (quadrant === 'top') {
+          flexClass = 'display: flex; flex-direction: column-reverse; align-items: center; gap: 2px;';
+          iconAnchor = [50, 26];
+          iconSize = [100, 32];
+        } else if (quadrant === 'bottom') {
+          flexClass = 'display: flex; flex-direction: column; align-items: center; gap: 2px;';
+          iconAnchor = [50, 5];
+          iconSize = [100, 32];
+        }
+
         const poleBadgeIcon = L.divIcon({
           className: 'cluster-pole-badge-icon',
           html: `
-            <div style="display: flex; align-items: center; gap: 4px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
-              <div style="width: 12px; height: 12px; border-radius: 50%; background: ${
+            <div style="${flexClass} pointer-events: auto; cursor: pointer; white-space: nowrap;">
+              <div style="width: 11px; height: 11px; border-radius: 50%; background: ${
                 isSelected ? '#38bdf8' : '#854d0e'
-              }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fde047'}; box-shadow: 0 0 10px ${
+              }; border: 2px solid ${isSelected ? '#ffffff' : '#fde047'}; box-shadow: 0 0 8px ${
             isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
-          };"></div>
+          }; shrink-0;"></div>
               <span style="background: ${
                 isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(15, 23, 42, 0.92)'
-              }; color: ${isSelected ? '#ffffff' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${
+              }; color: ${isSelected ? '#ffffff' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3.5px; border: 1px solid ${
             isSelected ? '#38bdf8' : '#78350f'
           }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
-                ${shortCode} (${distM}m)
+                ${shortCode} <span style="opacity: 0.8; font-size: 8px;">(${distM}m)</span>
               </span>
             </div>
           `,
-          iconSize: [90, 20],
-          iconAnchor: [6, 6],
+          iconSize: iconSize,
+          iconAnchor: iconAnchor,
         });
 
         const marker = L.marker([pLat, pLon], { icon: poleBadgeIcon });
@@ -959,26 +1026,33 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         isExpanded
           ? 'inset-6 z-[2500]'
           : isDrawerOpen
-          ? 'bottom-4 right-[396px] w-[450px] h-[390px] z-[1500]'
-          : 'bottom-4 right-4 w-[450px] h-[390px] z-[1500]'
+          ? 'bottom-4 right-[396px] w-[530px] h-[430px] z-[1500]'
+          : 'bottom-4 right-4 w-[530px] h-[430px] z-[1500]'
       } bg-slate-900/98 border ${
         entityColors.border
       } rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
     >
       {/* Header Bar */}
-      <div className="px-3.5 py-2.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
-        <div className="flex items-center space-x-2.5">
-          <div className={`w-7 h-7 rounded-lg ${entityColors.iconBg} border flex items-center justify-center`}>
+      <div className="px-3 py-2 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
+        <div className="flex items-center space-x-2 min-w-0 flex-1 mr-2">
+          <div className={`w-7 h-7 rounded-lg ${entityColors.iconBg} border flex items-center justify-center shrink-0`}>
             {getEntityIcon()}
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-white tracking-wide">{targetAsset.name || targetAsset.code}</span>
-              <span className={`text-[10px] ${entityColors.badgeBg} border px-1.5 py-0.2 rounded font-mono`}>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-1.5">
+              <span
+                className="font-bold text-white tracking-wide truncate max-w-[210px] text-xs"
+                title={targetAsset.name || targetAsset.code}
+              >
+                {targetAsset.name || targetAsset.code}
+              </span>
+              <span
+                className={`text-[10px] ${entityColors.badgeBg} border px-1.5 py-0.2 rounded font-mono shrink-0 whitespace-nowrap`}
+              >
                 {getEntityBadge()}
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-mono">
+            <p className="text-[10px] text-slate-400 font-mono truncate">
               {getEntityCategoryDesc()} &bull;{' '}
               <span className={`${entityColors.accentText} font-bold`}>{currentZoom}x Zoom</span>
             </p>
@@ -986,9 +1060,8 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         </div>
 
         {/* Quick Zoom Presets & Action Controls */}
-        <div className="flex items-center space-x-1">
-          {/* Quick Zoom Level Selectors */}
-          <div className="flex items-center space-x-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono mr-1">
+        <div className="flex items-center space-x-1 shrink-0">
+          <div className="flex items-center space-x-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono mr-0.5">
             <button
               onClick={() => mapInstanceRef.current?.setZoom(20)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
@@ -1025,48 +1098,48 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => mapInstanceRef.current?.zoomOut()}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => centerCoords && mapInstanceRef.current?.setView(centerCoords, 21.5)}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Recenter Focal Asset"
           >
-            <Navigation className="w-4 h-4" />
+            <Navigation className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title={isExpanded ? 'Minimize' : 'Expand'}
           >
-            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={onClose}
             className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
             title="Close Zoom Window"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Attribute Selector Toolbar within Zoom Window */}
-      <div className="px-3 py-1.5 bg-slate-950/75 border-b border-slate-800 flex items-center justify-between text-[10px] font-mono">
-        <div className="flex items-center space-x-1 flex-wrap gap-y-1">
-          <span className="text-slate-500 uppercase text-[9px] mr-1">Attributes:</span>
+      <div className="px-3 py-1.5 bg-slate-950/85 border-b border-slate-800 flex items-center justify-between text-[10px] font-mono">
+        <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar py-0.5">
+          <span className="text-slate-500 uppercase text-[9px] mr-0.5 shrink-0">Attributes:</span>
 
           {/* DP Structure Toggle */}
           <button
             onClick={() => setShowDP(!showDP)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showDP
                 ? 'bg-orange-500/25 text-orange-200 border border-orange-500/60 shadow-sm'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1080,7 +1153,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           {/* Poles Toggle */}
           <button
             onClick={() => setShowPolesLayer(!showPolesLayer)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showPolesLayer
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1094,7 +1167,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           {/* 11kV HT Toggle */}
           <button
             onClick={() => setShowHT(!showHT)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showHT
                 ? 'bg-red-500/20 text-red-300 border border-red-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1108,7 +1181,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           {/* 415V LT Toggle */}
           <button
             onClick={() => setShowLT(!showLT)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showLT
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1122,7 +1195,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           {/* DTR Toggle */}
           <button
             onClick={() => setShowDTRLayer(!showDTRLayer)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showDTRLayer
                 ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1136,7 +1209,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           {/* Switch Toggle */}
           <button
             onClick={() => setShowSwitchesLayer(!showSwitchesLayer)}
-            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 shrink-0 ${
               showSwitchesLayer
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -1146,9 +1219,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>Switches ({switchesCount})</span>
           </button>
-        </div>
-        <div className="text-[9px] text-slate-400 truncate max-w-[120px]">
-          Active: <b className="text-cyan-300">{selectedAsset?.name || selectedAsset?.code || 'None'}</b>
         </div>
       </div>
 

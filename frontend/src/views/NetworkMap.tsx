@@ -144,6 +144,7 @@ export const NetworkMap: React.FC = () => {
       {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxNativeZoom: 19,
         maxZoom: 20,
       }
     ).addTo(map);
@@ -201,7 +202,12 @@ export const NetworkMap: React.FC = () => {
 
     mapInstanceRef.current = map;
 
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+
     return () => {
+      clearTimeout(timer);
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -240,10 +246,15 @@ export const NetworkMap: React.FC = () => {
     const newTileLayer = L.tileLayer(url, {
       attribution: attr,
       subdomains: sub,
+      maxNativeZoom: 19,
       maxZoom: 20,
     }).addTo(mapInstanceRef.current);
 
     tileLayerRef.current = newTileLayer;
+
+    setTimeout(() => {
+      mapInstanceRef.current?.invalidateSize();
+    }, 100);
   }, [baseMap]);
 
   // 3. Fetch Network Data from Backend
@@ -282,6 +293,9 @@ export const NetworkMap: React.FC = () => {
       ],
       { padding: [40, 40], maxZoom: 17, animate: true }
     );
+    setTimeout(() => {
+      mapInstanceRef.current?.invalidateSize();
+    }, 150);
   }, [data?.bounds]);
 
   // Expose global cluster zoom opener for Leaflet HTML popups
