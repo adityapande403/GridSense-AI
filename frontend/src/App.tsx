@@ -3,6 +3,7 @@ import { Activity, ShieldAlert, Cpu, Database, Compass, Zap, GitBranch, Trending
 import { ProvenanceBadge } from './components/ProvenanceBadge';
 import { StatusBadge } from './components/StatusBadge';
 import { NetworkMap } from './views/NetworkMap';
+import { SwitchingWorkbench } from './views/SwitchingWorkbench';
 
 interface SystemHealth {
   status: string;
@@ -16,8 +17,34 @@ interface SystemHealth {
 
 export const App: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>('map');
+  const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(hash)) {
+      return hash as any;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['overview', 'map', 'switching', 'capex', 'scenarios'].includes(tabParam)) {
+      return tabParam as any;
+    }
+    return 'switching'; // Default to switching for Milestone 8 demonstration
+  });
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(hash)) {
+        setActiveTab(hash as any);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     fetch('/api/v1/health')
@@ -248,15 +275,15 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {(activeTab === 'switching' || activeTab === 'capex' || activeTab === 'scenarios') && (
+        {activeTab === 'switching' && <SwitchingWorkbench />}
+
+        {(activeTab === 'capex' || activeTab === 'scenarios') && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
               <ShieldAlert className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-              {activeTab === 'switching'
-                ? 'Switching & FLISR Workbench (Milestone 8)'
-                : activeTab === 'capex'
+              {activeTab === 'capex'
                 ? 'CAPEX Intelligence Planner (Milestone 9)'
                 : 'Scenario Simulator Sandbox (Milestone 10)'}
             </h3>
