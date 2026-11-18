@@ -58,6 +58,8 @@ interface PhysicsSimulationBarProps {
   onOpenContingencyModal: () => void;
   heatmapActive: boolean;
   onToggleHeatmap: (active: boolean) => void;
+  isLayersCollapsed?: boolean;
+  className?: string;
 }
 
 export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
@@ -68,6 +70,8 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
   onOpenContingencyModal,
   heatmapActive,
   onToggleHeatmap,
+  isLayersCollapsed = false,
+  className,
 }) => {
   const [loadMultiplier, setLoadMultiplier] = useState<number>(1.0);
   const [ambientTempC, setAmbientTempC] = useState<number>(35.0);
@@ -76,7 +80,11 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
 
   return (
     <>
-      <div className="absolute top-4 left-[235px] right-4 z-[900] pointer-events-none">
+      <div
+        className={`absolute top-[56px] ${
+          isLayersCollapsed ? 'left-24' : 'left-[234px]'
+        } right-3 z-[650] pointer-events-none transition-all duration-300 ${className || ''}`}
+      >
         <div className="bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-2xl backdrop-blur-md overflow-hidden pointer-events-auto transition-all duration-200">
           {/* Top Control Bar */}
           <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-800">

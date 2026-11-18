@@ -17,6 +17,7 @@ interface SystemHealth {
 export const App: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>('overview');
+  const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
   useEffect(() => {
     fetch('/api/v1/health')
@@ -25,96 +26,117 @@ export const App: React.FC = () => {
       .catch((err) => console.error('Failed to fetch backend health status', err));
   }, []);
 
+  const showTopBars = !isMapFullscreen || activeTab !== 'map';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden">
       {/* Top Advisory Banner */}
-      <div className="bg-amber-950/80 border-b border-amber-600/40 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <ShieldAlert className="w-4 h-4 text-amber-400" />
-          <span className="font-semibold tracking-wide">ADVISORY-ONLY PLATFORM:</span>
-          <span className="text-amber-300/90">
-            No direct SCADA actuation. Recommendations require operator engineering sign-off.
-          </span>
-        </div>
-        <div className="flex items-center space-x-3 text-xs">
-          <span>Target: <strong>TSSPDCL / TSNPDCL</strong></span>
-          <span className="text-amber-500">•</span>
-          <span>TISC 2026 Challenge 08</span>
-        </div>
-      </div>
-
-      {/* Primary Header */}
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold">
-            <Zap className="w-6 h-6 text-blue-400" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-xl font-bold tracking-tight text-white">GridSense-AI</h1>
-              <span className="text-xs font-mono bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded">
-                v0.1.0-M1
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Distribution Network Sectionalizing, Load Switching & CAPEX Intelligence
-            </p>
-          </div>
-        </div>
-
-        {/* System Telemetry & Status Indicator */}
-        <div className="flex items-center space-x-6 text-sm">
+      {showTopBars && (
+        <div className="bg-amber-950/80 border-b border-amber-600/40 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Database className="w-4 h-4 text-slate-400" />
-            <span className="text-xs text-slate-400">PostGIS Engine:</span>
-            <span
-              className={`text-xs font-mono font-medium ${
-                health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
-              }`}
-            >
-              {health?.database_connected ? `ONLINE (${health.tables_count} Tables)` : 'CONNECTING...'}
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span className="font-semibold tracking-wide">ADVISORY-ONLY PLATFORM:</span>
+            <span className="text-amber-300/90">
+              No direct SCADA actuation. Recommendations require operator engineering sign-off.
             </span>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Cpu className="w-4 h-4 text-slate-400" />
-            <span className="text-xs text-slate-400">Physics Core:</span>
-            <span className="text-xs font-mono text-cyan-400">pandapower AC Newton-Raphson</span>
+          <div className="flex items-center space-x-3 text-xs">
+            <span>Target: <strong>TSSPDCL / TSNPDCL</strong></span>
+            <span className="text-amber-500">•</span>
+            <span>TISC 2026 Challenge 08</span>
           </div>
         </div>
-      </header>
+      )}
+
+      {/* Primary Header */}
+      {showTopBars && (
+        <header className="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold">
+              <Zap className="w-6 h-6 text-blue-400" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-3">
+                <h1 className="text-xl font-bold tracking-tight text-white">GridSense-AI</h1>
+                <span className="text-xs font-mono bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded">
+                  v0.1.0-M1
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Distribution Network Sectionalizing, Load Switching & CAPEX Intelligence
+              </p>
+            </div>
+          </div>
+
+          {/* System Telemetry & Status Indicator */}
+          <div className="flex items-center space-x-6 text-sm">
+            <div className="flex items-center space-x-2">
+              <Database className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-400">PostGIS Engine:</span>
+              <span
+                className={`text-xs font-mono font-medium ${
+                  health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                {health?.database_connected ? `ONLINE (${health.tables_count} Tables)` : 'CONNECTING...'}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Cpu className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-400">Physics Core:</span>
+              <span className="text-xs font-mono text-cyan-400">pandapower AC Newton-Raphson</span>
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Navigation Tabs (Tier 1 Screens) */}
-      <nav className="bg-slate-900/60 border-b border-slate-800 px-6 flex space-x-1">
-        {[
-          { id: 'overview', label: 'Executive Overview', icon: Activity },
-          { id: 'map', label: 'Network Digital Twin (Map SLD)', icon: Compass },
-          { id: 'switching', label: 'Switching & FLISR Workbench', icon: Zap },
-          { id: 'capex', label: 'CAPEX Intelligence', icon: TrendingUp },
-          { id: 'scenarios', label: 'Scenario Simulator', icon: GitBranch },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
-                isActive
-                  ? 'border-blue-500 text-blue-400 bg-blue-500/10'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      {showTopBars && (
+        <nav className="bg-slate-900/60 border-b border-slate-800 px-6 flex space-x-1">
+          {[
+            { id: 'overview', label: 'Executive Overview', icon: Activity },
+            { id: 'map', label: 'Network Digital Twin (Map SLD)', icon: Compass },
+            { id: 'switching', label: 'Switching & FLISR Workbench', icon: Zap },
+            { id: 'capex', label: 'CAPEX Intelligence', icon: TrendingUp },
+            { id: 'scenarios', label: 'Scenario Simulator', icon: GitBranch },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center space-x-2 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+                  isActive
+                    ? 'border-blue-500 text-blue-400 bg-blue-500/10'
+                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {/* Main Workspace Body */}
-      <main className="flex-1 p-6 space-y-6">
-        {activeTab === 'map' && <NetworkMap />}
+      <main
+        className={`flex-1 ${
+          activeTab === 'map'
+            ? isMapFullscreen
+              ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
+              : 'relative w-full h-[calc(100vh-7.5rem)] p-0 m-0 overflow-hidden bg-slate-950'
+            : 'p-6 space-y-6'
+        }`}
+      >
+        {activeTab === 'map' && (
+          <NetworkMap
+            isFullscreen={isMapFullscreen}
+            onToggleFullscreen={() => setIsMapFullscreen(!isMapFullscreen)}
+          />
+        )}
 
         {activeTab === 'overview' && (
           <div className="space-y-6">

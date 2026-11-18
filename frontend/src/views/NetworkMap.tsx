@@ -5,11 +5,14 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
   RefreshCw,
   AlertTriangle,
   Layers,
   Map as MapIcon,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
@@ -94,7 +97,15 @@ interface NetworkGeoJSONResponse {
 
 type BaseMapType = 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
 
-export const NetworkMap: React.FC = () => {
+export interface NetworkMapProps {
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+}
+
+export const NetworkMap: React.FC<NetworkMapProps> = ({
+  isFullscreen = false,
+  onToggleFullscreen,
+}) => {
   const [data, setData] = useState<NetworkGeoJSONResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +115,7 @@ export const NetworkMap: React.FC = () => {
   const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
   const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
   const [selectedClusterAsset, setSelectedClusterAsset] = useState<SelectedAsset | null>(null);
+  const [isLayersCollapsed, setIsLayersCollapsed] = useState<boolean>(false);
 
   // Milestone 5: Physics Simulation Core (TR-PHY)
   const [powerFlowData, setPowerFlowData] = useState<PowerFlowSummaryData | null>(null);
@@ -335,6 +347,21 @@ export const NetworkMap: React.FC = () => {
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Handle Dynamic Resize / Fullscreen transitions
+  useEffect(() => {
+    const handleResize = () => {
+      mapInstanceRef.current?.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+    const t1 = setTimeout(handleResize, 100);
+    const t2 = setTimeout(handleResize, 350);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [isFullscreen]);
 
   // 2. Handle Base Map Tile Layer Switch
   useEffect(() => {
@@ -1145,18 +1172,45 @@ export const NetworkMap: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-14rem)] space-y-4">
-      {/* Top Header & Operational Filters */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
-        <div className="flex items-center space-x-4">
+    <div className="relative w-full h-full overflow-hidden bg-slate-950 select-none">
+      {/* 1. Giant Full-Bleed Map Canvas Background */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        {loading && (
+          <div className="absolute inset-0 z-[600] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center space-x-3 text-slate-300 text-sm">
+            <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
+            <span className="font-mono">Rendering 100% Complete Distribution Network...</span>
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 z-[600] bg-slate-950/80 flex items-center justify-center space-x-3 text-rose-400 text-sm">
+            <AlertTriangle className="w-5 h-5" />
+            <span>{error}</span>
+          </div>
+        )}
+        <div
+          ref={mapContainerRef}
+          className="w-full h-full transition-colors duration-200 cursor-grab active:cursor-grabbing"
+          style={{
+            background:
+              baseMap === 'carto-voyager' || baseMap === 'osm'
+                ? '#e2e8f0'
+                : '#020617',
+          }}
+        />
+      </div>
+
+      {/* 2. Top Floating Header HUD */}
+      <div className="absolute top-3 left-3 right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center space-x-3">
+          {/* Active Feeder Selector */}
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-mono text-slate-400">ACTIVE FEEDER:</span>
+            <span className="text-[11px] font-mono font-bold text-slate-400 tracking-wider">FEEDER:</span>
             <select
               value={selectedFeeder}
               onChange={(e) => setSelectedFeeder(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+              className="bg-slate-950/90 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
             >
-              <option value="all">All Available Network Feeders</option>
+              <option value="all">All Network Feeders</option>
               {data?.feeders.map((f) => (
                 <option key={f.code} value={f.code}>
                   {f.name} ({f.code})
@@ -1165,12 +1219,14 @@ export const NetworkMap: React.FC = () => {
             </select>
           </div>
 
+          <div className="h-4 w-px bg-slate-700/80" />
+
           {/* Base Map Style Selector */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs font-medium">
+          <div className="flex items-center bg-slate-950/80 border border-slate-700/80 rounded-lg p-0.5 text-xs font-medium">
             <button
               onClick={() => setBaseMap('carto-voyager')}
-              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'carto-voyager' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'carto-voyager' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
@@ -1178,8 +1234,8 @@ export const NetworkMap: React.FC = () => {
             </button>
             <button
               onClick={() => setBaseMap('carto-dark')}
-              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'carto-dark' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'carto-dark' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
@@ -1187,8 +1243,8 @@ export const NetworkMap: React.FC = () => {
             </button>
             <button
               onClick={() => setBaseMap('osm')}
-              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'osm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'osm' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -1196,8 +1252,8 @@ export const NetworkMap: React.FC = () => {
             </button>
             <button
               onClick={() => setBaseMap('satellite')}
-              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'satellite' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'satellite' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
@@ -1206,58 +1262,72 @@ export const NetworkMap: React.FC = () => {
           </div>
         </div>
 
-        {/* Live Summary Chips */}
+        {/* Live Summary Chips & Top Controls */}
         {data && (
-          <div className="flex items-center space-x-3 text-xs font-mono">
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span className="text-slate-400">HT Lines:</span>
+          <div className="flex items-center space-x-2.5 text-xs font-mono">
+            <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
+              <span className="text-slate-400">HT:</span>
               <span className="text-rose-400 font-bold">{data.summary.total_ht_lines || 36}</span>
             </div>
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span className="text-slate-400">LT Lines:</span>
+            <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
+              <span className="text-slate-400">LT:</span>
               <span className="text-cyan-400 font-bold">{data.summary.total_lt_lines || 517}</span>
             </div>
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+            <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
               <span className="text-slate-400">Poles:</span>
-              <span className="text-amber-500 font-bold">{data.summary.total_poles || 608}</span>
+              <span className="text-amber-400 font-bold">{data.summary.total_poles || 608}</span>
             </div>
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+            <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
               <span className="text-slate-400">DTRs:</span>
               <span className="text-pink-400 font-bold">{data.summary.total_dtrs}</span>
             </div>
-            <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+            <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
               <span className="text-slate-400">Switches:</span>
               <span className="text-purple-400 font-bold">{data.summary.total_switches}</span>
             </div>
             {data.summary.overloaded_dtrs_count > 0 && (
-              <div className="flex items-center space-x-1.5 bg-rose-950/60 border border-rose-800 px-3 py-1 rounded-lg text-rose-300 animate-pulse">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+              <div className="flex items-center space-x-1.5 bg-rose-950/80 border border-rose-700 px-2 py-0.5 rounded-lg text-rose-300 font-bold animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-rose-400" />
                 <span>{data.summary.overloaded_dtrs_count} Overloaded</span>
               </div>
             )}
             <button
               onClick={() => fetchNetworkData(selectedFeeder)}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors"
+              className="p-1 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 transition-colors"
               title="Refresh Network Twin"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
+            {onToggleFullscreen && (
+              <button
+                onClick={onToggleFullscreen}
+                className={`p-1 rounded-lg border transition-colors flex items-center space-x-1 ${
+                  isFullscreen
+                    ? 'bg-blue-600/30 border-blue-500 text-blue-300 hover:bg-blue-600/50'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+                title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Giant Map'}
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                <span className="hidden xl:inline text-[10px] font-mono">{isFullscreen ? 'Exit Full' : 'Full Map'}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Main Map Canvas Area */}
-      <div className="flex-1 relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex">
-        {/* Milestone 5: Floating Physics Simulation HUD Bar */}
-        <PhysicsSimulationBar
-          feederCode={selectedFeeder}
-          isSimulating={isSimulating}
-          powerFlowData={powerFlowData}
-          onRunPowerFlow={handleRunPowerFlow}
-          onOpenContingencyModal={handleRunContingency}
-          heatmapActive={heatmapActive}
-          onToggleHeatmap={handleToggleHeatmap}
-        />
+      {/* Floating HUD Layer: Controls & Simulation */}
+      {/* 4. Floating Physics Simulation Core HUD Bar */}
+      <PhysicsSimulationBar
+        feederCode={selectedFeeder}
+        isSimulating={isSimulating}
+        powerFlowData={powerFlowData}
+        onRunPowerFlow={handleRunPowerFlow}
+        onOpenContingencyModal={handleRunContingency}
+        heatmapActive={heatmapActive}
+        onToggleHeatmap={handleToggleHeatmap}
+        isLayersCollapsed={isLayersCollapsed}
+      />
 
         {/* N-1 Contingency Screening Modal */}
         <ContingencyModal
@@ -1275,8 +1345,33 @@ export const NetworkMap: React.FC = () => {
         />
 
         {/* Layer Controls Palette (Floating Top Left matching QGIS) */}
-        <div className="absolute top-4 left-4 z-[500] bg-slate-900/95 border border-slate-800/80 rounded-xl p-3 shadow-xl backdrop-blur-md space-y-2 text-xs">
-          <span className="font-mono text-slate-400 uppercase tracking-wider block mb-1">QGIS Ingested Layers</span>
+        {isLayersCollapsed ? (
+          <button
+            onClick={() => setIsLayersCollapsed(false)}
+            className="absolute top-[56px] left-3 z-[650] bg-slate-900/95 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-2xl backdrop-blur-md flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+            title="Expand QGIS Layers"
+          >
+            <Layers className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-mono text-[11px] font-semibold">Layers</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        ) : (
+          <div className="absolute top-[56px] left-3 z-[650] bg-slate-900/95 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md space-y-2 text-xs w-[215px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+              <div className="flex items-center space-x-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-400" />
+                <span className="font-mono text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+                  QGIS Layers
+                </span>
+              </div>
+              <button
+                onClick={() => setIsLayersCollapsed(true)}
+                className="p-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                title="Collapse Layers"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
           <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
             <input
               type="checkbox"
@@ -1358,92 +1453,66 @@ export const NetworkMap: React.FC = () => {
             <span>Consumers ({data?.consumers?.features?.length || 0})</span>
           </label>
         </div>
+      )}
 
-        {/* Canvas Navigation Tools (Floating Bottom Left) */}
-        <div className="absolute bottom-4 left-4 z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-800/80 rounded-xl p-1 shadow-xl backdrop-blur-md">
-          <button
-            onClick={handleZoomIn}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleFitBounds}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Fit to Feeder Bounds"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Topological Integrity Pill (Floating Bottom Center) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/90 border border-emerald-800/60 text-emerald-300 px-4 py-1.5 rounded-full shadow-xl backdrop-blur-md flex items-center space-x-2 text-xs font-mono">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>TOPOLOGICAL CONSISTENCY: 100% GIS ALIGNED &bull; 553 LINES &bull; 608 POLES &bull; 4 DTRS</span>
-        </div>
-
-        {/* Interactive Leaflet Map Container */}
-        <div className="flex-1 w-full h-full relative">
-          {loading && (
-            <div className="absolute inset-0 z-[600] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center space-x-3 text-slate-400 text-sm">
-              <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
-              <span>Rendering 100% Complete Distribution Network...</span>
-            </div>
-          )}
-          {error && (
-            <div className="absolute inset-0 z-[600] bg-slate-950/80 flex items-center justify-center space-x-3 text-rose-400 text-sm">
-              <AlertTriangle className="w-5 h-5" />
-              <span>{error}</span>
-            </div>
-          )}
-          <div
-            ref={mapContainerRef}
-            className="w-full h-full transition-colors duration-200"
-            style={{
-              background:
-                baseMap === 'carto-voyager' || baseMap === 'osm'
-                  ? '#e2e8f0'
-                  : '#020617',
-            }}
-          />
-        </div>
-
-        {/* Unified High-Resolution Cluster Magnifier Window (Works for All Network Attributes) */}
-        <DTRClusterZoomWindow
-          isOpen={isClusterZoomOpen && selectedClusterAsset !== null}
-          onClose={() => setIsClusterZoomOpen(false)}
-          clusterAsset={selectedClusterAsset}
-          dtr={selectedDTR}
-          networkData={data}
-          baseMap={baseMap}
-          isDrawerOpen={selectedAsset !== null}
-          showHTLines={showHTLines}
-          showLTLines={showLTLines}
-          showPoles={showPoles}
-          showDPStructures={showDPStructures}
-          showDTRs={showDTRs}
-          showSwitches={showSwitches}
-          selectedAsset={selectedAsset}
-          onSelectAsset={(asset) => {
-            setSelectedAsset(asset);
-            setSelectedClusterAsset(asset);
-          }}
-        />
-
-        {/* Slide-in Asset Inspection Drawer */}
-        <AssetInspectionDrawer
-          asset={selectedAsset}
-          onClose={handleCloseDrawer}
-        />
+      {/* 6. Canvas Navigation Tools (Floating Bottom Left) */}
+      <div className="absolute bottom-4 left-4 z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-md">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Zoom In"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Zoom Out"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleFitBounds}
+          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Fit to Feeder Bounds"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* 7. Topological Integrity Pill (Floating Bottom Center) */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/90 border border-emerald-700/70 text-emerald-300 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center space-x-2 text-xs font-mono pointer-events-none">
+        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <span>TOPOLOGICAL CONSISTENCY: 100% GIS ALIGNED &bull; 553 LINES &bull; 608 POLES &bull; 4 DTRS</span>
+      </div>
+
+      {/* 8. Unified High-Resolution Cluster Magnifier Window (Works for All Network Attributes) */}
+      <DTRClusterZoomWindow
+        isOpen={isClusterZoomOpen && selectedClusterAsset !== null}
+        onClose={() => setIsClusterZoomOpen(false)}
+        clusterAsset={selectedClusterAsset}
+        dtr={selectedDTR}
+        networkData={data}
+        baseMap={baseMap}
+        isDrawerOpen={selectedAsset !== null}
+        showHTLines={showHTLines}
+        showLTLines={showLTLines}
+        showPoles={showPoles}
+        showDPStructures={showDPStructures}
+        showDTRs={showDTRs}
+        showSwitches={showSwitches}
+        selectedAsset={selectedAsset}
+        onSelectAsset={(asset) => {
+          setSelectedAsset(asset);
+          setSelectedClusterAsset(asset);
+        }}
+      />
+
+      {/* 9. Slide-in Asset Inspection Drawer */}
+      <AssetInspectionDrawer
+        asset={selectedAsset}
+        onClose={handleCloseDrawer}
+      />
     </div>
   );
 };
