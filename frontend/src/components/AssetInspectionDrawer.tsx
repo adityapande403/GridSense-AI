@@ -7,7 +7,7 @@ export interface SelectedAsset {
   id: string;
   code: string;
   name?: string;
-  entity_type: 'substation' | 'line' | 'distribution_transformer' | 'switch' | 'consumer';
+  entity_type: 'substation' | 'line' | 'distribution_transformer' | 'switch' | 'consumer' | 'pole';
   voltage_kv?: number;
   provenance: 'synthetic' | 'measured' | 'estimated' | 'predicted' | 'assumed';
   confidence_score?: number;

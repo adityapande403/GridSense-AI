@@ -298,6 +298,9 @@ def get_network_geojson(
         elif "SEC" in line.code or "BR" in line.code:
             loading_pct = 52.0
 
+        is_ht = not (line.code.startswith("LL-") or line.code.startswith("LC-") or "LT_" in line.conductor_type)
+        line_voltage = 11.0 if is_ht else 0.415
+
         feeder_obj = next((f for f in feeders if f.id == line.feeder_id), None)
         line_features.append(
             {
@@ -316,7 +319,8 @@ def get_network_geojson(
                     "r_ohm_per_km": line.r_ohm_per_km,
                     "x_ohm_per_km": line.x_ohm_per_km,
                     "max_i_ka": line.max_i_ka,
-                    "voltage_kv": 11.0,
+                    "voltage_kv": line_voltage,
+                    "is_ht": is_ht,
                     "is_operational": line.is_operational,
                     "loading_pct": loading_pct,
                     "provenance": line.provenance,
@@ -324,6 +328,28 @@ def get_network_geojson(
                 },
             }
         )
+
+    # 2b. Physical Poles & Support Structures
+    pole_features = []
+    for b in buses:
+        if b.geom and (b.voltage_level_kv < 1.0 or "PL-" in b.code or "Pole" in (b.name or "")):
+            track_point(b.geom)
+            coords = [float(b.geom.x), float(b.geom.y)]
+            pole_features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": coords},
+                    "properties": {
+                        "id": str(b.id),
+                        "code": b.code,
+                        "name": b.name or f"Pole {b.code}",
+                        "entity_type": "pole",
+                        "voltage_level_kv": b.voltage_level_kv,
+                        "provenance": b.provenance,
+                        "confidence_score": b.confidence_score,
+                    },
+                }
+            )
 
     # 3. Distribution Transformers FeatureCollection
     dtr_features = []
@@ -467,6 +493,7 @@ def get_network_geojson(
         ],
         "substations": {"type": "FeatureCollection", "features": substation_features},
         "lines": {"type": "FeatureCollection", "features": line_features},
+        "poles": {"type": "FeatureCollection", "features": pole_features},
         "transformers": {"type": "FeatureCollection", "features": dtr_features},
         "switches": {"type": "FeatureCollection", "features": switch_features},
         "consumers": {"type": "FeatureCollection", "features": consumer_features},
@@ -475,7 +502,10 @@ def get_network_geojson(
             "total_feeders": len(feeders),
             "total_buses": len(buses),
             "total_lines": len(lines),
+            "total_ht_lines": sum(1 for l in line_features if l["properties"]["is_ht"]),
+            "total_lt_lines": sum(1 for l in line_features if not l["properties"]["is_ht"]),
             "total_dtrs": len(dtrs),
+            "total_poles": len(pole_features),
             "total_switches": len(switches),
             "total_consumers": len(consumer_features),
             "overloaded_dtrs_count": overloaded_count,
