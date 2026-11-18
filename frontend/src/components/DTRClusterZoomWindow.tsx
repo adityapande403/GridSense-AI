@@ -1,7 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, Navigation, Zap, Info, Layers } from 'lucide-react';
+import {
+  X,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Minimize2,
+  Navigation,
+  Zap,
+  Info,
+  Layers,
+  Activity,
+  Cpu,
+  ToggleLeft,
+} from 'lucide-react';
 import { SelectedAsset } from './AssetInspectionDrawer';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
@@ -19,6 +32,7 @@ interface DTRClusterZoomWindowProps {
   showPoles?: boolean;
   showDPStructures?: boolean;
   showDTRs?: boolean;
+  showSwitches?: boolean;
   selectedAsset?: SelectedAsset | null;
   onSelectAsset?: (asset: SelectedAsset) => void;
 }
@@ -36,6 +50,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   showPoles = true,
   showDPStructures = true,
   showDTRs = true,
+  showSwitches = true,
   selectedAsset,
   onSelectAsset,
 }) => {
@@ -48,9 +63,12 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   const [showPolesLayer, setShowPolesLayer] = useState<boolean>(showPoles);
   const [showDP, setShowDP] = useState<boolean>(showDPStructures);
   const [showDTRLayer, setShowDTRLayer] = useState<boolean>(showDTRs);
+  const [showSwitchesLayer, setShowSwitchesLayer] = useState<boolean>(showSwitches);
 
   const [dpCount, setDpCount] = useState<number>(0);
   const [stdPolesCount, setStdPolesCount] = useState<number>(0);
+  const [dtrCount, setDtrCount] = useState<number>(0);
+  const [switchesCount, setSwitchesCount] = useState<number>(0);
   const [mapReady, setMapReady] = useState<number>(0);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -61,6 +79,8 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     poles: L.LayerGroup;
     dpStructures: L.LayerGroup;
     dtr: L.LayerGroup;
+    switches: L.LayerGroup;
+    substations: L.LayerGroup;
   } | null>(null);
 
   // Sync with parent props when changed globally
@@ -79,11 +99,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   useEffect(() => {
     setShowDTRLayer(showDTRs);
   }, [showDTRs]);
+  useEffect(() => {
+    setShowSwitchesLayer(showSwitches);
+  }, [showSwitches]);
 
   const targetAsset = clusterAsset || dtr;
-  const isTargetDTR = targetAsset?.entity_type === 'distribution_transformer';
 
-  // Extract Center Coordinates (works for DTR or any Pole/Junction)
+  // Extract Center Coordinates (works universally for any attribute: line, switch, substation, DTR, pole)
   const getCenterCoords = (): [number, number] | null => {
     if (!targetAsset) return null;
     const props = targetAsset.properties || {};
@@ -99,10 +121,30 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         return [pFeat.geometry.coordinates[1], pFeat.geometry.coordinates[0]];
       }
     }
-    if (isTargetDTR && networkData?.transformers?.features) {
+    if (targetAsset.entity_type === 'distribution_transformer' && networkData?.transformers?.features) {
       const dFeat = networkData.transformers.features.find((f: any) => f.properties.code === targetAsset.code);
       if (dFeat?.geometry?.coordinates) {
         return [dFeat.geometry.coordinates[1], dFeat.geometry.coordinates[0]];
+      }
+    }
+    if (targetAsset.entity_type === 'line' && networkData?.lines?.features) {
+      const lFeat = networkData.lines.features.find((f: any) => f.properties.code === targetAsset.code);
+      const coords = lFeat?.geometry?.coordinates;
+      if (coords && coords.length > 0) {
+        const mid = coords[Math.floor(coords.length / 2)];
+        return [mid[1], mid[0]];
+      }
+    }
+    if (targetAsset.entity_type === 'switch' && networkData?.switches?.features) {
+      const sFeat = networkData.switches.features.find((f: any) => f.properties.code === targetAsset.code);
+      if (sFeat?.geometry?.coordinates) {
+        return [sFeat.geometry.coordinates[1], sFeat.geometry.coordinates[0]];
+      }
+    }
+    if (targetAsset.entity_type === 'substation' && networkData?.substations?.features) {
+      const subFeat = networkData.substations.features.find((f: any) => f.properties.code === targetAsset.code);
+      if (subFeat?.geometry?.coordinates) {
+        return [subFeat.geometry.coordinates[1], subFeat.geometry.coordinates[0]];
       }
     }
     return [11.270127, 75.765721];
@@ -139,6 +181,104 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       return parts[parts.length - 1] || code;
     }
     return code.length > 10 ? code.slice(-6) : code;
+  };
+
+  // Dynamic entity styling helpers
+  const getEntityColors = () => {
+    const type = targetAsset?.entity_type;
+    switch (type) {
+      case 'distribution_transformer':
+        return {
+          border: 'border-pink-500/50',
+          badgeBg: 'bg-pink-950/60 border-pink-800 text-pink-300',
+          iconBg: 'bg-pink-500/20 border-pink-500/40 text-pink-400',
+          accentText: 'text-pink-300',
+          btnActive: 'bg-pink-600',
+        };
+      case 'line':
+        return {
+          border: 'border-cyan-500/50',
+          badgeBg: 'bg-cyan-950/60 border-cyan-800 text-cyan-300',
+          iconBg: 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400',
+          accentText: 'text-cyan-300',
+          btnActive: 'bg-cyan-600',
+        };
+      case 'switch':
+        return {
+          border: 'border-emerald-500/50',
+          badgeBg: 'bg-emerald-950/60 border-emerald-800 text-emerald-300',
+          iconBg: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400',
+          accentText: 'text-emerald-300',
+          btnActive: 'bg-emerald-600',
+        };
+      case 'substation':
+        return {
+          border: 'border-purple-500/50',
+          badgeBg: 'bg-purple-950/60 border-purple-800 text-purple-300',
+          iconBg: 'bg-purple-500/20 border-purple-500/40 text-purple-400',
+          accentText: 'text-purple-300',
+          btnActive: 'bg-purple-600',
+        };
+      case 'pole':
+      default:
+        return {
+          border: 'border-orange-500/50',
+          badgeBg: 'bg-orange-950/60 border-orange-800 text-orange-300',
+          iconBg: 'bg-orange-500/20 border-orange-500/40 text-orange-400',
+          accentText: 'text-orange-300',
+          btnActive: 'bg-orange-600',
+        };
+    }
+  };
+
+  const getEntityIcon = () => {
+    switch (targetAsset?.entity_type) {
+      case 'distribution_transformer':
+        return <Zap className="w-4 h-4 text-pink-400" />;
+      case 'line':
+        return <Activity className="w-4 h-4 text-cyan-400" />;
+      case 'switch':
+        return <ToggleLeft className="w-4 h-4 text-emerald-400" />;
+      case 'substation':
+        return <Cpu className="w-4 h-4 text-purple-400" />;
+      case 'pole':
+      default:
+        return <Layers className="w-4 h-4 text-orange-400" />;
+    }
+  };
+
+  const getEntityCategoryDesc = () => {
+    switch (targetAsset?.entity_type) {
+      case 'distribution_transformer':
+        return 'DTR Micro-Cluster Magnifier';
+      case 'line':
+        return 'Line Span Micro-Magnifier';
+      case 'switch':
+        return 'Switchgear & Tie Point Magnifier';
+      case 'substation':
+        return 'Substation Bay & Gantry Magnifier';
+      case 'pole':
+      default:
+        return 'Dense Street & Junction Magnifier';
+    }
+  };
+
+  const getEntityBadge = () => {
+    if (!targetAsset) return '';
+    const p = targetAsset.properties || {};
+    switch (targetAsset.entity_type) {
+      case 'distribution_transformer':
+        return `${p.rated_kva || 100} kVA`;
+      case 'line':
+        return `${p.conductor_type || 'Line'} • ${(p.length_km || 0).toFixed(2)} km`;
+      case 'switch':
+        return `${(p.switch_type || 'Switch').toUpperCase()} • ${(p.current_status || 'closed').toUpperCase()}`;
+      case 'substation':
+        return `${p.nominal_kv || 33} kV • ${p.ptr_capacity_mva || 10} MVA`;
+      case 'pole':
+      default:
+        return p.is_dp_structure ? '11 kV DP Structure' : `${stdPolesCount + dpCount} Poles Clustered`;
+    }
   };
 
   // 1. Initialize, Re-center or Dispose Cluster Mini-Map with Extra High Zoom
@@ -207,12 +347,16 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       const dpGroup = L.layerGroup().addTo(map);
       const polesGroup = L.layerGroup().addTo(map);
       const dtrGroup = L.layerGroup().addTo(map);
+      const switchesGroup = L.layerGroup().addTo(map);
+      const substationsGroup = L.layerGroup().addTo(map);
 
       clusterLayersRef.current = {
         lines: linesGroup,
         dpStructures: dpGroup,
         poles: polesGroup,
         dtr: dtrGroup,
+        switches: switchesGroup,
+        substations: substationsGroup,
       };
 
       mapInstanceRef.current = map;
@@ -267,17 +411,20 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     tileLayerRef.current = newTileLayer;
   }, [baseMap]);
 
-  // 3. Render Cluster Features with Functional Attribute Selection & Coincident Pole Spiderfying
+  // 3. Render Cluster Features for ALL Network Attributes
   useEffect(() => {
-    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !centerCoords || !networkData || !targetAsset) return;
+    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !centerCoords || !networkData || !targetAsset)
+      return;
 
     const [centerLat, centerLon] = centerCoords;
-    const { lines, dpStructures, poles, dtr: dtrGroup } = clusterLayersRef.current;
+    const { lines, dpStructures, poles, dtr: dtrGroup, switches, substations } = clusterLayersRef.current;
 
     lines.clearLayers();
     dpStructures.clearLayers();
     poles.clearLayers();
     dtrGroup.clearLayers();
+    switches.clearLayers();
+    substations.clearLayers();
 
     // A. Filter Poles in immediate Cluster (within 85 meters of focal center)
     const clusterPoles = (networkData.poles?.features || []).filter((poleFeat: any) => {
@@ -304,8 +451,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
     const clusterPoleCodes = new Set(clusterPoles.map((p: any) => p.properties.code));
 
-    // B. Filter Lines in Cluster
+    // B. Filter Lines in Cluster (within 85m or connected to cluster poles, or target line)
     const clusterLines = (networkData.lines?.features || []).filter((lineFeat: any) => {
+      if (targetAsset.entity_type === 'line' && lineFeat.properties.code === targetAsset.code) return true;
       const fromCode = lineFeat.properties.from_bus_code;
       const toCode = lineFeat.properties.to_bus_code;
       if (clusterPoleCodes.has(fromCode) || clusterPoleCodes.has(toCode)) return true;
@@ -344,7 +492,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       polyline.bindTooltip(
         `
         <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-          <div style="font-weight: bold; color: ${isHT ? '#ef4444' : '#38bdf8'};">${isHT ? '11 kV Primary Incomer' : '415 V LT Circuit Cable'}</div>
+          <div style="font-weight: bold; color: ${isHT ? '#ef4444' : '#38bdf8'};">${
+          isHT ? '11 kV Primary Incomer' : '415 V LT Circuit Cable'
+        }</div>
           <div>Conductor: <b>${lineFeat.properties.conductor_type}</b></div>
           <div>Span: <b>${lengthMeters} m</b> &bull; Load: <b>${lineFeat.properties.loading_pct}%</b></div>
           <div style="font-size: 9px; color: #38bdf8; margin-top: 2px;">Click to select & inspect attributes</div>
@@ -353,26 +503,10 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         { sticky: true, opacity: 0.95 }
       );
 
-      const linePopupHtml = `
-        <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-          <div style="font-size: 10px; font-weight: 700; color: ${isHT ? '#ef4444' : '#38bdf8'}; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
-            ${isHT ? '11 kV Primary Incomer' : '415 V LT Cable'}
-          </div>
-          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${lineFeat.properties.code}</div>
-          <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
-            <div>Conductor: <b>${lineFeat.properties.conductor_type}</b></div>
-            <div>Length: <b>${lengthMeters} meters</b></div>
-            <div>Loading: <b>${lineFeat.properties.loading_pct}%</b></div>
-            <div>Status: <b style="color: ${lineFeat.properties.is_operational !== false ? '#34d399' : '#f87171'}">${lineFeat.properties.is_operational !== false ? 'Energized' : 'De-energized'}</b></div>
-            <div style="font-size: 9px; color: #64748b; margin-top: 4px;">From: ${lineFeat.properties.from_bus_code} &rarr; To: ${lineFeat.properties.to_bus_code}</div>
-          </div>
-        </div>
-      `;
-
-      polyline.bindPopup(linePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
-
       polyline.on('click', () => {
         if (onSelectAsset) {
+          const midIdx = Math.floor(coords.length / 2);
+          const midPoint = coords[midIdx] || coords[0];
           onSelectAsset({
             id: lineFeat.properties.id,
             code: lineFeat.properties.code,
@@ -380,7 +514,10 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             entity_type: 'line',
             provenance: lineFeat.properties.provenance,
             confidence_score: lineFeat.properties.confidence_score,
-            properties: lineFeat.properties,
+            properties: {
+              ...lineFeat.properties,
+              coordinates: [midPoint[1], midPoint[0]],
+            },
           });
         }
       });
@@ -411,13 +548,18 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           pLat = origLat + (offsetM * Math.sin(angle)) / 111000;
           pLon = origLon + (offsetM * Math.cos(angle)) / (111000 * Math.cos((origLat * Math.PI) / 180));
 
-          // Draw spider connector dashed line
-          const spiderLine = L.polyline([[origLat, origLon], [pLat, pLon]], {
-            color: '#ea580c',
-            weight: 1.2,
-            dashArray: '2, 3',
-            opacity: 0.8,
-          });
+          const spiderLine = L.polyline(
+            [
+              [origLat, origLon],
+              [pLat, pLon],
+            ],
+            {
+              color: '#ea580c',
+              weight: 1.2,
+              dashArray: '2, 3',
+              opacity: 0.8,
+            }
+          );
           dpStructures.addLayer(spiderLine);
         }
 
@@ -428,15 +570,15 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               <div style="width: 18px; height: 18px; border-radius: 4px; background: ${
                 isSelected ? '#38bdf8' : '#ea580c'
               }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fed7aa'}; box-shadow: 0 0 14px ${
-                isSelected ? '#38bdf8' : '#ea580c'
-              }; display: flex; align-items: center; justify-content: center;">
+            isSelected ? '#38bdf8' : '#ea580c'
+          }; display: flex; align-items: center; justify-content: center;">
                 <div style="width: 5px; height: 5px; background: #ffffff; border-radius: 50%;"></div>
               </div>
               <span style="background: ${
                 isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(124, 45, 18, 0.92)'
               }; color: ${isSelected ? '#ffffff' : '#fed7aa'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1.5px solid ${
-                isSelected ? '#38bdf8' : '#ea580c'
-              }; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">
+            isSelected ? '#38bdf8' : '#ea580c'
+          }; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">
                 ${shortCode} (${distM}m)
               </span>
             </div>
@@ -446,25 +588,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         });
 
         const marker = L.marker([pLat, pLon], { icon: dpBadgeIcon });
-
-        const dpPopupHtml = `
-          <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 270px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-            <div style="font-size: 10px; font-weight: 700; color: #fb923c; text-transform: uppercase; border-bottom: 1px solid #7c2d12; padding-bottom: 4px; margin-bottom: 6px;">
-              11 kV Double-Pole (DP) Gantry Structure
-            </div>
-            <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
-            <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
-              <div>Asset Code: <b style="color: #fed7aa">${poleFeat.properties.code}</b></div>
-              <div>Distance from Focal Center: <b>${distM} meters</b></div>
-              <div>Operating Voltage: <b>11 kV Primary / 415 V Sec</b></div>
-              <div>Mounts: <b>DTR + DO Fuses + AB Switchgear + LA</b></div>
-              <div>Earthing: <b style="color: #34d399">IS 3043 Neutral & Body Double Pipe</b></div>
-              <div>Provenance: <b style="color: #38bdf8">${poleFeat.properties.provenance}</b></div>
-            </div>
-          </div>
-        `;
-
-        marker.bindPopup(dpPopupHtml, { maxWidth: 290, autoPan: false, closeButton: true });
+        marker.bindTooltip(`<b>11 kV DP Structure: ${poleFeat.properties.code}</b>`, { opacity: 0.95 });
 
         marker.on('click', () => {
           if (onSelectAsset) {
@@ -478,6 +602,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               properties: {
                 ...poleFeat.properties,
                 is_dp_structure: true,
+                coordinates: [origLat, origLon],
               },
             });
           }
@@ -510,13 +635,18 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           pLat = origLat + (offsetM * Math.sin(angle)) / 111000;
           pLon = origLon + (offsetM * Math.cos(angle)) / (111000 * Math.cos((origLat * Math.PI) / 180));
 
-          // Draw spider connector dashed line
-          const spiderLine = L.polyline([[origLat, origLon], [pLat, pLon]], {
-            color: '#854d0e',
-            weight: 1.2,
-            dashArray: '2, 3',
-            opacity: 0.7,
-          });
+          const spiderLine = L.polyline(
+            [
+              [origLat, origLon],
+              [pLat, pLon],
+            ],
+            {
+              color: '#854d0e',
+              weight: 1.2,
+              dashArray: '2, 3',
+              opacity: 0.7,
+            }
+          );
           poles.addLayer(spiderLine);
         }
 
@@ -527,13 +657,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               <div style="width: 12px; height: 12px; border-radius: 50%; background: ${
                 isSelected ? '#38bdf8' : '#854d0e'
               }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fde047'}; box-shadow: 0 0 10px ${
-                isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
-              };"></div>
+            isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
+          };"></div>
               <span style="background: ${
                 isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(15, 23, 42, 0.92)'
               }; color: ${isSelected ? '#ffffff' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${
-                isSelected ? '#38bdf8' : '#78350f'
-              }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
+            isSelected ? '#38bdf8' : '#78350f'
+          }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
                 ${shortCode} (${distM}m)
               </span>
             </div>
@@ -543,23 +673,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         });
 
         const marker = L.marker([pLat, pLon], { icon: poleBadgeIcon });
-
-        const polePopupHtml = `
-          <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-            <div style="font-size: 10px; font-weight: 700; color: #f59e0b; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
-              Distribution Support Pole
-            </div>
-            <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
-            <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
-              <div>Asset Code: <b>${poleFeat.properties.code}</b></div>
-              <div>Distance from Focal Center: <b>${distM} m</b></div>
-              <div>Operating Voltage: <b>${poleFeat.properties.voltage_level_kv || 0.415} kV</b></div>
-              <div>Provenance: <b style="color: #38bdf8">${poleFeat.properties.provenance}</b></div>
-            </div>
-          </div>
-        `;
-
-        marker.bindPopup(polePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
+        marker.bindTooltip(`<b>Pole: ${poleFeat.properties.code}</b> (${distM}m)`, { opacity: 0.95 });
 
         marker.on('click', () => {
           if (onSelectAsset) {
@@ -573,6 +687,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               properties: {
                 ...poleFeat.properties,
                 is_dp_structure: false,
+                coordinates: [origLat, origLon],
               },
             });
           }
@@ -582,62 +697,104 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       });
     }
 
-    // E. Render Central Beacon or Focal Junction Hub
-    if (isTargetDTR && showDTRLayer) {
-      const isDTRSelected = selectedAsset?.code === targetAsset.code;
-      const dtrIcon = L.divIcon({
-        className: 'cluster-dtr-center-icon',
-        html: `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; cursor: pointer;">
-            <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(236, 72, 153, ${
-              isDTRSelected ? '0.6' : '0.4'
-            }); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="width: 26px; height: 26px; border-radius: 50%; background: #ec4899; border: 3.5px solid ${
-              isDTRSelected ? '#38bdf8' : '#ffffff'
-            }; box-shadow: 0 0 20px #ec4899; display: flex; align-items: center; justify-content: center; z-index: 10;">
-              <div style="width: 7px; height: 7px; border-radius: 50%; background: #ffffff;"></div>
+    // E. Render Switches & Tie Points in Cluster
+    const clusterSwitches = (networkData.switches?.features || []).filter((swFeat: any) => {
+      if (targetAsset.entity_type === 'switch' && swFeat.properties.code === targetAsset.code) return true;
+      const c = swFeat.geometry?.coordinates;
+      if (!c) return false;
+      return getDistanceMeters(centerLat, centerLon, c[1], c[0]) <= 85;
+    });
+    setSwitchesCount(clusterSwitches.length);
+
+    if (showSwitchesLayer) {
+      clusterSwitches.forEach((swFeat: any) => {
+        const c = swFeat.geometry?.coordinates;
+        if (!c) return;
+        const sLat = c[1];
+        const sLon = c[0];
+        const isNO = swFeat.properties.is_normally_open;
+        const isClosed = swFeat.properties.current_status === 'closed';
+        const isSelected = selectedAsset?.code === swFeat.properties.code;
+
+        const swDiv = L.divIcon({
+          className: 'cluster-sw-icon',
+          html: `
+            <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; cursor: pointer;">
+              ${
+                isSelected
+                  ? '<div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #38bdf8; animation: ping 1.5s infinite;"></div>'
+                  : ''
+              }
+              <div style="width: 18px; height: 18px; border-radius: ${isNO ? '50%' : '4px'}; background: ${
+            isNO ? 'rgba(255,237,213,0.95)' : isClosed ? '#059669' : '#dc2626'
+          }; border: 2px solid ${isSelected ? '#38bdf8' : isNO ? '#ea580c' : '#ffffff'}; box-shadow: 0 0 10px ${
+            isNO ? '#ea580c' : 'rgba(0,0,0,0.5)'
+          }; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: ${
+                  isNO ? '#ea580c' : '#ffffff'
+                };"></div>
+              </div>
             </div>
-          </div>
-        `,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
+          `,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+
+        const marker = L.marker([sLat, sLon], { icon: swDiv });
+        marker.bindTooltip(
+          `<b>${swFeat.properties.code}</b> (${isNO ? 'Open Tie' : swFeat.properties.current_status?.toUpperCase()})`,
+          { opacity: 0.95 }
+        );
+
+        marker.on('click', () => {
+          if (onSelectAsset) {
+            onSelectAsset({
+              id: swFeat.properties.id,
+              code: swFeat.properties.code,
+              name: swFeat.properties.name,
+              entity_type: 'switch',
+              provenance: swFeat.properties.provenance,
+              confidence_score: swFeat.properties.confidence_score,
+              properties: {
+                ...swFeat.properties,
+                coordinates: [sLat, sLon],
+              },
+            });
+          }
+        });
+
+        switches.addLayer(marker);
       });
+    }
 
-      const dtrMarker = L.marker([centerLat, centerLon], { icon: dtrIcon });
+    // F. Render Substations in Cluster (or Focal Substation)
+    const clusterSubstations = (networkData.substations?.features || []).filter((subFeat: any) => {
+      if (targetAsset.entity_type === 'substation' && subFeat.properties.code === targetAsset.code) return true;
+      const c = subFeat.geometry?.coordinates;
+      if (!c) return false;
+      return getDistanceMeters(centerLat, centerLon, c[1], c[0]) <= 85;
+    });
 
-      const dtrPopupHtml = `
-        <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 260px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-          <div style="font-size: 10px; font-weight: 700; color: #ec4899; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
-            Distribution Transformer (Center)
-          </div>
-          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${targetAsset.name || targetAsset.code}</div>
-          <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
-            <div>Rating: <b>${targetAsset.properties?.rated_kva || 100} kVA</b></div>
-            <div>Loading: <b>${targetAsset.properties?.loading_pct || 72}%</b></div>
-            <div>Primary: 11 kV &bull; Secondary: 415 V Stepdown</div>
-            <div>Provenance: <b style="color: #38bdf8">${targetAsset.provenance}</b></div>
-          </div>
-        </div>
-      `;
+    clusterSubstations.forEach((subFeat: any) => {
+      const c = subFeat.geometry?.coordinates;
+      if (!c) return;
+      const subLat = c[1];
+      const subLon = c[0];
+      const isSelected = selectedAsset?.code === subFeat.properties.code;
 
-      dtrMarker.bindPopup(dtrPopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
-
-      dtrMarker.on('click', () => {
-        if (onSelectAsset) {
-          onSelectAsset(targetAsset);
-        }
-      });
-
-      dtrGroup.addLayer(dtrMarker);
-    } else if (!isTargetDTR) {
-      // For Non-DTR Pole Clusters: Render Focal Hub Crosshair
-      const hubIcon = L.divIcon({
-        className: 'cluster-focal-hub-icon',
+      const subDiv = L.divIcon({
+        className: 'cluster-sub-icon',
         html: `
           <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer;">
-            <div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.25); animation: pulse 2s infinite;"></div>
-            <div style="width: 14px; height: 14px; border-radius: 50%; background: #ea580c; border: 2.5px solid #ffffff; box-shadow: 0 0 12px #ea580c; display: flex; align-items: center; justify-content: center;">
-              <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
+            ${
+              isSelected
+                ? '<div style="position: absolute; width: 38px; height: 38px; border-radius: 50%; border: 2px solid #38bdf8; animation: ping 1.5s infinite;"></div>'
+                : ''
+            }
+            <div style="width: 22px; height: 22px; transform: rotate(45deg); background: #581c87; border: 2.5px solid ${
+              isSelected ? '#38bdf8' : '#c084fc'
+            }; box-shadow: 0 0 12px #a855f7; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 6px; height: 6px; background: #e9d5ff; border-radius: 50%;"></div>
             </div>
           </div>
         `,
@@ -645,44 +802,130 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         iconAnchor: [17, 17],
       });
 
-      const hubMarker = L.marker([centerLat, centerLon], { icon: hubIcon });
-      hubMarker.bindTooltip(
-        `
-        <div style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid #ea580c;">
-          <div style="font-weight: bold; color: #fb923c;">FOCAL CLUSTER HUB</div>
-          <div>${targetAsset.name || targetAsset.code}</div>
-        </div>
-        `,
-        { direction: 'top', offset: [0, -10], opacity: 1 }
-      );
-      poles.addLayer(hubMarker);
+      const marker = L.marker([subLat, subLon], { icon: subDiv });
+      marker.bindTooltip(`<b>Substation: ${subFeat.properties.name || subFeat.properties.code}</b>`, {
+        opacity: 0.95,
+      });
 
-      // Also render any DTR that might be inside this 85m cluster
-      if (showDTRLayer && networkData?.transformers?.features) {
-        networkData.transformers.features.forEach((dFeat: any) => {
-          const dCoords = dFeat.geometry?.coordinates;
-          if (!dCoords) return;
-          const dLat = dCoords[1];
-          const dLon = dCoords[0];
-          if (getDistanceMeters(centerLat, centerLon, dLat, dLon) <= 85) {
-            const dIcon = L.divIcon({
-              className: 'cluster-dtr-icon-sub',
-              html: `
-                <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; cursor: pointer;">
-                  <div style="width: 18px; height: 18px; border-radius: 50%; background: #ec4899; border: 2.5px solid #ffffff; box-shadow: 0 0 12px #ec4899; display: flex; align-items: center; justify-content: center;">
-                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
-                  </div>
-                </div>
-              `,
-              iconSize: [28, 28],
-              iconAnchor: [14, 14],
+      marker.on('click', () => {
+        if (onSelectAsset) {
+          onSelectAsset({
+            id: subFeat.properties.id,
+            code: subFeat.properties.code,
+            name: subFeat.properties.name,
+            entity_type: 'substation',
+            provenance: subFeat.properties.provenance,
+            confidence_score: subFeat.properties.confidence_score,
+            properties: {
+              ...subFeat.properties,
+              coordinates: [subLat, subLon],
+            },
+          });
+        }
+      });
+
+      substations.addLayer(marker);
+    });
+
+    // G. Render DTRs in Cluster (or Focal DTR)
+    const clusterDTRs = (networkData.transformers?.features || []).filter((dFeat: any) => {
+      if (targetAsset.entity_type === 'distribution_transformer' && dFeat.properties.code === targetAsset.code)
+        return true;
+      const c = dFeat.geometry?.coordinates;
+      if (!c) return false;
+      return getDistanceMeters(centerLat, centerLon, c[1], c[0]) <= 85;
+    });
+    setDtrCount(clusterDTRs.length);
+
+    if (showDTRLayer) {
+      clusterDTRs.forEach((dFeat: any) => {
+        const c = dFeat.geometry?.coordinates;
+        if (!c) return;
+        const dLat = c[1];
+        const dLon = c[0];
+        const isSelected = selectedAsset?.code === dFeat.properties.code;
+        const isFocal = targetAsset.code === dFeat.properties.code;
+
+        const dtrIcon = L.divIcon({
+          className: 'cluster-dtr-icon',
+          html: `
+            <div style="position: relative; display: flex; align-items: center; justify-content: center; width: ${
+              isFocal ? '46px' : '32px'
+            }; height: ${isFocal ? '46px' : '32px'}; cursor: pointer;">
+              ${
+                isFocal
+                  ? `<div style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(236, 72, 153, ${
+                      isSelected ? '0.6' : '0.4'
+                    }); animation: ping 2s infinite;"></div>`
+                  : ''
+              }
+              <div style="width: ${isFocal ? '24px' : '18px'}; height: ${
+            isFocal ? '24px' : '18px'
+          }; border-radius: 50%; background: #ec4899; border: 2.5px solid ${
+            isSelected ? '#38bdf8' : '#ffffff'
+          }; box-shadow: 0 0 16px #ec4899; display: flex; align-items: center; justify-content: center; z-index: 10;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: #ffffff;"></div>
+              </div>
+            </div>
+          `,
+          iconSize: isFocal ? [46, 46] : [32, 32],
+          iconAnchor: isFocal ? [23, 23] : [16, 16],
+        });
+
+        const dtrMarker = L.marker([dLat, dLon], { icon: dtrIcon });
+        dtrMarker.bindTooltip(
+          `<b>DTR: ${dFeat.properties.name || dFeat.properties.code}</b> (${dFeat.properties.rated_kva} kVA)`,
+          { opacity: 0.95 }
+        );
+
+        dtrMarker.on('click', () => {
+          if (onSelectAsset) {
+            onSelectAsset({
+              id: dFeat.properties.id,
+              code: dFeat.properties.code,
+              name: dFeat.properties.name,
+              entity_type: 'distribution_transformer',
+              provenance: dFeat.properties.provenance,
+              confidence_score: dFeat.properties.confidence_score,
+              properties: {
+                ...dFeat.properties,
+                coordinates: [dLat, dLon],
+              },
             });
-            const dMarker = L.marker([dLat, dLon], { icon: dIcon });
-            dMarker.bindTooltip(`<b>DTR: ${dFeat.properties.name || dFeat.properties.code}</b>`, { opacity: 0.95 });
-            dtrGroup.addLayer(dMarker);
           }
         });
-      }
+
+        dtrGroup.addLayer(dtrMarker);
+      });
+    }
+
+    // H. Focal Center Hub Beacon (for line, switch, pole or substation when target is not a DTR)
+    if (targetAsset.entity_type !== 'distribution_transformer') {
+      const focalColor =
+        targetAsset.entity_type === 'line'
+          ? '#38bdf8'
+          : targetAsset.entity_type === 'switch'
+          ? '#10b981'
+          : targetAsset.entity_type === 'substation'
+          ? '#a855f7'
+          : '#ea580c';
+
+      const hubIcon = L.divIcon({
+        className: 'cluster-focal-hub-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; pointer-events: none;">
+            <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px dashed ${focalColor}; background: rgba(56, 189, 248, 0.15); animation: pulse 2s infinite;"></div>
+            <div style="width: 14px; height: 14px; border-radius: 50%; background: ${focalColor}; border: 2.5px solid #ffffff; box-shadow: 0 0 14px ${focalColor}; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
+            </div>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
+
+      const hubMarker = L.marker([centerLat, centerLon], { icon: hubIcon });
+      poles.addLayer(hubMarker);
     }
   }, [
     isOpen,
@@ -696,6 +939,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     showDP,
     showPolesLayer,
     showDTRLayer,
+    showSwitchesLayer,
     selectedAsset?.code,
     targetAsset?.code,
   ]);
@@ -707,6 +951,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   const loadingPct = props.loading_pct || 72;
   const isOverloaded = loadingPct > 100;
   const totalClusterPoles = stdPolesCount + dpCount;
+  const entityColors = getEntityColors();
 
   return (
     <div
@@ -714,58 +959,40 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         isExpanded
           ? 'inset-6 z-[2500]'
           : isDrawerOpen
-          ? 'bottom-6 right-[404px] w-[530px] h-[500px] z-[1500]'
-          : 'bottom-6 right-6 w-[530px] h-[500px] z-[1500]'
-      } bg-slate-900/98 ${
-        isTargetDTR ? 'border-pink-500/50' : 'border-orange-500/50'
-      } border rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
+          ? 'bottom-4 right-[396px] w-[450px] h-[390px] z-[1500]'
+          : 'bottom-4 right-4 w-[450px] h-[390px] z-[1500]'
+      } bg-slate-900/98 border ${
+        entityColors.border
+      } rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
     >
       {/* Header Bar */}
-      <div className="px-4 py-3 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
+      <div className="px-3.5 py-2.5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2.5">
-          <div
-            className={`w-7 h-7 rounded-lg ${
-              isTargetDTR
-                ? 'bg-pink-500/20 border-pink-500/40 text-pink-400'
-                : 'bg-orange-500/20 border-orange-500/40 text-orange-400'
-            } border flex items-center justify-center`}
-          >
-            {isTargetDTR ? <Zap className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
+          <div className={`w-7 h-7 rounded-lg ${entityColors.iconBg} border flex items-center justify-center`}>
+            {getEntityIcon()}
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <span className="font-bold text-white tracking-wide">{targetAsset.name || targetAsset.code}</span>
-              <span
-                className={`text-[10px] ${
-                  isTargetDTR
-                    ? 'bg-pink-950/60 border-pink-800 text-pink-300'
-                    : 'bg-orange-950/60 border-orange-800 text-orange-300'
-                } border px-1.5 py-0.2 rounded font-mono`}
-              >
-                {isTargetDTR ? `${ratedKva} kVA` : `${totalClusterPoles} Poles Clustered`}
+              <span className={`text-[10px] ${entityColors.badgeBg} border px-1.5 py-0.2 rounded font-mono`}>
+                {getEntityBadge()}
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-mono">
-              {isTargetDTR ? 'Triangle Cluster Magnifier' : 'Dense Street & Junction Magnifier'} &bull;{' '}
-              <span className={`${isTargetDTR ? 'text-pink-300' : 'text-orange-300'} font-bold`}>
-                {currentZoom}x Zoom
-              </span>
+              {getEntityCategoryDesc()} &bull;{' '}
+              <span className={`${entityColors.accentText} font-bold`}>{currentZoom}x Zoom</span>
             </p>
           </div>
         </div>
 
         {/* Quick Zoom Presets & Action Controls */}
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1">
           {/* Quick Zoom Level Selectors */}
-          <div className="flex items-center space-x-1 bg-slate-900 px-1.5 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono mr-1">
+          <div className="flex items-center space-x-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono mr-1">
             <button
               onClick={() => mapInstanceRef.current?.setZoom(20)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom <= 20.2
-                  ? isTargetDTR
-                    ? 'bg-pink-600 text-white font-bold'
-                    : 'bg-orange-600 text-white font-bold'
-                  : 'text-slate-400 hover:text-white'
+                currentZoom <= 20.2 ? `${entityColors.btnActive} text-white font-bold` : 'text-slate-400 hover:text-white'
               }`}
               title="20x Zoom: Cluster Overview (~80m span)"
             >
@@ -775,9 +1002,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               onClick={() => mapInstanceRef.current?.setZoom(21.5)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
                 currentZoom > 20.2 && currentZoom <= 22.2
-                  ? isTargetDTR
-                    ? 'bg-pink-600 text-white font-bold'
-                    : 'bg-orange-600 text-white font-bold'
+                  ? `${entityColors.btnActive} text-white font-bold`
                   : 'text-slate-400 hover:text-white'
               }`}
               title="21.5x Zoom: Micro-Inspection (~25m span)"
@@ -787,13 +1012,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <button
               onClick={() => mapInstanceRef.current?.setZoom(23)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom > 22.2
-                  ? isTargetDTR
-                    ? 'bg-pink-600 text-white font-bold'
-                    : 'bg-orange-600 text-white font-bold'
-                  : 'text-slate-400 hover:text-white'
+                currentZoom > 22.2 ? `${entityColors.btnActive} text-white font-bold` : 'text-slate-400 hover:text-white'
               }`}
-              title="23x Zoom: Ultra Close-Up Single Poles & Drops (~5m span)"
+              title="23x Zoom: Ultra Close-Up Details (~5m span)"
             >
               23x
             </button>
@@ -816,7 +1037,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           <button
             onClick={() => centerCoords && mapInstanceRef.current?.setView(centerCoords, 21.5)}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Recenter Focal Cluster Point"
+            title="Recenter Focal Asset"
           >
             <Navigation className="w-4 h-4" />
           </button>
@@ -838,65 +1059,70 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       </div>
 
       {/* Attribute Selector Toolbar within Zoom Window */}
-      <div className="px-4 py-2 bg-slate-950/75 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono">
-        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+      <div className="px-3 py-1.5 bg-slate-950/75 border-b border-slate-800 flex items-center justify-between text-[10px] font-mono">
+        <div className="flex items-center space-x-1 flex-wrap gap-y-1">
           <span className="text-slate-500 uppercase text-[9px] mr-1">Attributes:</span>
-          {/* DP Structure Attribute Selector Button - No Emoji */}
+
+          {/* DP Structure Toggle */}
           <button
             onClick={() => setShowDP(!showDP)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
               showDP
                 ? 'bg-orange-500/25 text-orange-200 border border-orange-500/60 shadow-sm'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
             }`}
-            title="Toggle 11 kV DP (Double-Pole) Transformer Gantry Structure"
+            title="Toggle 11 kV DP Structure"
           >
-            <span className="w-2 h-2 rounded-xs bg-orange-500 inline-block border border-orange-300" />
-            <span className="font-bold">DP Structure ({dpCount})</span>
+            <span className="w-1.5 h-1.5 rounded-xs bg-orange-500 inline-block border border-orange-300" />
+            <span className="font-bold">DP ({dpCount})</span>
           </button>
 
+          {/* Poles Toggle */}
           <button
             onClick={() => setShowPolesLayer(!showPolesLayer)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
               showPolesLayer
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
             }`}
-            title="Toggle Distribution Support Poles"
+            title="Toggle Support Poles"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             <span>Poles ({stdPolesCount})</span>
           </button>
 
+          {/* 11kV HT Toggle */}
           <button
             onClick={() => setShowHT(!showHT)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
               showHT
                 ? 'bg-red-500/20 text-red-300 border border-red-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
             }`}
-            title="Toggle 11 kV HT Incomer Lines"
+            title="Toggle 11 kV HT Lines"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             <span>11kV HT</span>
           </button>
 
+          {/* 415V LT Toggle */}
           <button
             onClick={() => setShowLT(!showLT)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
               showLT
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
             }`}
-            title="Toggle 415 V LT Circuit Lines"
+            title="Toggle 415 V LT Lines"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
             <span>415V LT</span>
           </button>
 
+          {/* DTR Toggle */}
           <button
             onClick={() => setShowDTRLayer(!showDTRLayer)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
               showDTRLayer
                 ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
@@ -904,11 +1130,25 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             title="Toggle DTR Station"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
-            <span>DTR Center</span>
+            <span>DTR ({dtrCount})</span>
+          </button>
+
+          {/* Switch Toggle */}
+          <button
+            onClick={() => setShowSwitchesLayer(!showSwitchesLayer)}
+            className={`px-1.5 py-0.5 rounded transition-all flex items-center space-x-1 ${
+              showSwitchesLayer
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle Switches & Tie Points"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Switches ({switchesCount})</span>
           </button>
         </div>
-        <div className="text-[10px] text-slate-400">
-          Selected: <b className="text-cyan-300">{selectedAsset?.name || selectedAsset?.code || 'None'}</b>
+        <div className="text-[9px] text-slate-400 truncate max-w-[120px]">
+          Active: <b className="text-cyan-300">{selectedAsset?.name || selectedAsset?.code || 'None'}</b>
         </div>
       </div>
 
@@ -918,9 +1158,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       </div>
 
       {/* Cluster Summary Footer Bar */}
-      <div className="px-4 py-2.5 bg-slate-950/95 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
-        <div className="flex items-center space-x-3 text-[11px]">
-          {isTargetDTR ? (
+      <div className="px-3.5 py-2 bg-slate-950/95 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono">
+        <div className="flex items-center space-x-2 text-[10px] truncate">
+          {targetAsset.entity_type === 'distribution_transformer' ? (
             <>
               <span className="text-slate-400">Loading:</span>
               <span
@@ -931,25 +1171,61 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
                 {loadingPct}% {isOverloaded ? '(Overloaded)' : '(Optimal)'}
               </span>
               <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Rating:</span>
+              <span className="text-pink-300 font-bold">{ratedKva} kVA</span>
+              <span className="text-slate-600">&bull;</span>
               <span className="text-slate-400">Mount:</span>
-              <span className="text-orange-400 font-semibold">11 kV DP Gantry (PSC 9m)</span>
+              <span className="text-orange-400 font-semibold">11 kV DP Gantry</span>
+            </>
+          ) : targetAsset.entity_type === 'line' ? (
+            <>
+              <span className="text-slate-400">Span:</span>
+              <span className="text-cyan-300 font-bold">{((props.length_km || 0) * 1000).toFixed(0)} m</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Type:</span>
+              <span className="text-slate-200">{props.conductor_type || 'ACSR'}</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Status:</span>
+              <span className={props.is_operational !== false ? 'text-emerald-400' : 'text-rose-400'}>
+                {props.is_operational !== false ? 'Energized' : 'De-energized'}
+              </span>
+            </>
+          ) : targetAsset.entity_type === 'switch' ? (
+            <>
+              <span className="text-slate-400">Status:</span>
+              <span
+                className={`font-bold ${props.current_status === 'closed' ? 'text-emerald-400' : 'text-rose-400'}`}
+              >
+                {(props.current_status || 'closed').toUpperCase()}
+              </span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Type:</span>
+              <span className="text-orange-300">{(props.switch_type || 'Switch').toUpperCase()}</span>
+            </>
+          ) : targetAsset.entity_type === 'substation' ? (
+            <>
+              <span className="text-slate-400">Capacity:</span>
+              <span className="text-purple-300 font-bold">{props.ptr_capacity_mva || 10} MVA</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Feeders:</span>
+              <span className="text-slate-200">{props.feeder_count || 3}</span>
             </>
           ) : (
             <>
-              <span className="text-slate-400">Cluster Density:</span>
+              <span className="text-slate-400">Cluster:</span>
               <span className="text-amber-300 font-bold">{totalClusterPoles} Poles</span>
               <span className="text-slate-600">&bull;</span>
-              <span className="text-slate-400">DP Gantries:</span>
+              <span className="text-slate-400">DP:</span>
               <span className="text-orange-400 font-semibold">{dpCount}</span>
               <span className="text-slate-600">&bull;</span>
-              <span className="text-slate-400">Coverage:</span>
-              <span className="text-cyan-400 font-semibold">85m Radius</span>
+              <span className="text-slate-400">Radius:</span>
+              <span className="text-cyan-400 font-semibold">85m</span>
             </>
           )}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+        <div className="text-[9px] text-slate-400 flex items-center space-x-1 shrink-0">
           <Info className="w-3 h-3 text-cyan-400" />
-          <span>Click poles or cables to inspect attributes</span>
+          <span>Click elements to inspect</span>
         </div>
       </div>
     </div>

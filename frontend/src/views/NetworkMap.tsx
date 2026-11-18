@@ -480,7 +480,7 @@ export const NetworkMap: React.FC = () => {
           }
         });
 
-        // Click Handler: Highlight active line, open popup & open inspection drawer
+        // Click Handler: Highlight active line, close map popup & open micro-zoom inspection
         polyline.on('click', function (this: L.Polyline) {
           if (activePolylineRef.current && activePolylineRef.current !== this) {
             const prev = activePolylineRef.current;
@@ -495,15 +495,28 @@ export const NetworkMap: React.FC = () => {
             weight: 6.0,
           });
 
-          setSelectedAsset({
+          mapInstanceRef.current?.closePopup();
+
+          const rawCoords = lineFeat.geometry?.coordinates || [];
+          const midIdx = Math.floor(rawCoords.length / 2);
+          const midPoint = rawCoords[midIdx] || rawCoords[0] || [0, 0];
+
+          const lineAsset: SelectedAsset = {
             id: lineFeat.properties.id,
             code: lineFeat.properties.code,
             name: lineFeat.properties.name,
             entity_type: 'line',
             provenance: lineFeat.properties.provenance,
             confidence_score: lineFeat.properties.confidence_score,
-            properties: lineFeat.properties,
-          });
+            properties: {
+              ...lineFeat.properties,
+              coordinates: [midPoint[1], midPoint[0]],
+            },
+          };
+
+          setSelectedAsset(lineAsset);
+          setSelectedClusterAsset(lineAsset);
+          setIsClusterZoomOpen(true);
         });
 
         if (isHT) {
@@ -572,7 +585,7 @@ export const NetworkMap: React.FC = () => {
                 : ''
             }
             <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">${
-              isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Click to inspect &bull; Double-click to Micro-Zoom'
+              isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Click to inspect & Micro-Zoom'
             }</div>
           </div>
           `,
@@ -587,12 +600,6 @@ export const NetworkMap: React.FC = () => {
             </div>
           `
           : '';
-
-        const clusterActionBtn = `
-          <button onclick="window.__openClusterZoom('${poleFeat.properties.code}')" style="width: 100%; margin-top: 8px; padding: 7px 10px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
-            🔍 Open Micro-Zoom Cluster Window (21.5x)
-          </button>
-        `;
 
         const polePopupHtml = `
           <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 275px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
@@ -616,7 +623,6 @@ export const NetworkMap: React.FC = () => {
               <div>Type: <b>${isDP ? 'Double-Pole (PSC 9m Gantry)' : 'Single Pole Structure'}</b></div>
               <div>Provenance: <b style="color: #38bdf8;">${poleFeat.properties.provenance}</b></div>
             </div>
-            ${clusterActionBtn}
           </div>
         `;
 
@@ -641,6 +647,7 @@ export const NetworkMap: React.FC = () => {
         };
 
         circleMarker.on('click', () => {
+          mapInstanceRef.current?.closePopup();
           setSelectedAsset(poleAsset);
           setSelectedClusterAsset(poleAsset);
           setIsClusterZoomOpen(true);
@@ -648,6 +655,7 @@ export const NetworkMap: React.FC = () => {
 
         circleMarker.on('dblclick', (e) => {
           L.DomEvent.stopPropagation(e);
+          mapInstanceRef.current?.closePopup();
           setSelectedAsset(poleAsset);
           setSelectedClusterAsset(poleAsset);
           setIsClusterZoomOpen(true);
@@ -725,15 +733,22 @@ export const NetworkMap: React.FC = () => {
         });
 
         marker.on('click', () => {
-          setSelectedAsset({
+          mapInstanceRef.current?.closePopup();
+          const subAsset: SelectedAsset = {
             id: subFeat.properties.id,
             code: subFeat.properties.code,
             name: subFeat.properties.name,
             entity_type: 'substation',
             provenance: subFeat.properties.provenance,
             confidence_score: subFeat.properties.confidence_score,
-            properties: subFeat.properties,
-          });
+            properties: {
+              ...subFeat.properties,
+              coordinates: [lat, lon],
+            },
+          };
+          setSelectedAsset(subAsset);
+          setSelectedClusterAsset(subAsset);
+          setIsClusterZoomOpen(true);
         });
 
         substations.addLayer(marker);
@@ -824,15 +839,22 @@ export const NetworkMap: React.FC = () => {
         });
 
         marker.on('click', () => {
-          setSelectedAsset({
+          mapInstanceRef.current?.closePopup();
+          const swAsset: SelectedAsset = {
             id: swFeat.properties.id,
             code: swFeat.properties.code,
             name: swFeat.properties.name,
             entity_type: 'switch',
             provenance: swFeat.properties.provenance,
             confidence_score: swFeat.properties.confidence_score,
-            properties: swFeat.properties,
-          });
+            properties: {
+              ...swFeat.properties,
+              coordinates: [lat, lon],
+            },
+          };
+          setSelectedAsset(swAsset);
+          setSelectedClusterAsset(swAsset);
+          setIsClusterZoomOpen(true);
         });
 
         switches.addLayer(marker);
@@ -1209,7 +1231,7 @@ export const NetworkMap: React.FC = () => {
           <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#020617' }} />
         </div>
 
-        {/* Unified High-Resolution Cluster Magnifier Window (Works for DTRs and Non-DTR Clusters) */}
+        {/* Unified High-Resolution Cluster Magnifier Window (Works for All Network Attributes) */}
         <DTRClusterZoomWindow
           isOpen={isClusterZoomOpen && selectedClusterAsset !== null}
           onClose={() => setIsClusterZoomOpen(false)}
@@ -1223,18 +1245,18 @@ export const NetworkMap: React.FC = () => {
           showPoles={showPoles}
           showDPStructures={showDPStructures}
           showDTRs={showDTRs}
+          showSwitches={showSwitches}
           selectedAsset={selectedAsset}
-          onSelectAsset={(asset) => setSelectedAsset(asset)}
+          onSelectAsset={(asset) => {
+            setSelectedAsset(asset);
+            setSelectedClusterAsset(asset);
+          }}
         />
 
         {/* Slide-in Asset Inspection Drawer */}
         <AssetInspectionDrawer
           asset={selectedAsset}
           onClose={handleCloseDrawer}
-          onOpenClusterZoom={(asset) => {
-            setSelectedClusterAsset(asset);
-            setIsClusterZoomOpen(true);
-          }}
         />
       </div>
     </div>
