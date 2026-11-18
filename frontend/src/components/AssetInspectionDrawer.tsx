@@ -282,27 +282,67 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
             </div>
           )}
 
-          {/* Pole Specific Metrics */}
+          {/* Pole or DP Structure Specific Metrics */}
           {asset.entity_type === 'pole' && (
             <div className="space-y-4">
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
-                <div className="flex justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-400">Structure Type:</span>
-                  <span className="text-amber-400 font-semibold">{props.name || 'Support Pole (PSC)'}</span>
+              {props.is_dp_structure || (props.name && props.name.includes('DP')) ? (
+                <div className="space-y-3">
+                  <div className="bg-orange-950/40 border border-orange-700/60 rounded-xl p-3.5 space-y-1">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-orange-400 font-bold">
+                      Substation Mounting Structure
+                    </span>
+                    <h4 className="text-sm font-bold text-orange-200">11 kV Double-Pole (DP) Gantry</h4>
+                    <p className="text-[11px] text-slate-300">
+                      Standard KSEB PSC 9m DP structure carrying distribution transformer, drop-out (DO) fuses, and AB switchgear.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+                    <div className="flex justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Structure Specification:</span>
+                      <span className="text-orange-300 font-semibold">{props.name || 'PSC 9m 10FT DP'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Asset Code:</span>
+                      <span className="text-slate-200 font-bold">{props.code}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Mounted Equipment:</span>
+                      <span className="text-cyan-400 font-medium">DTR + DO Fuses + LA + AB Switch</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Operating Voltage:</span>
+                      <span className="text-slate-200 font-semibold">11 kV Primary / 415 V Sec</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-800/60">
+                      <span className="text-slate-400">Earthing Standard:</span>
+                      <span className="text-emerald-400">IS 3043 Pipe Earthing (Dual)</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-400">Survey Lineage:</span>
+                      <span className="text-emerald-400 font-semibold">DGPS Measured Field Point</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-400">Asset Code:</span>
-                  <span className="text-slate-200 font-bold">{props.code}</span>
+              ) : (
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Structure Type:</span>
+                    <span className="text-amber-400 font-semibold">{props.name || 'Support Pole (PSC)'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Asset Code:</span>
+                    <span className="text-slate-200 font-bold">{props.code}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400">Operating Voltage:</span>
+                    <span className="text-slate-200">{props.voltage_level_kv || 0.415} kV</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-400">Survey Method:</span>
+                    <span className="text-emerald-400 font-semibold">DGPS Field Survey (Measured)</span>
+                  </div>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-400">Operating Voltage:</span>
-                  <span className="text-slate-200">{props.voltage_level_kv || 0.415} kV</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Survey Method:</span>
-                  <span className="text-emerald-400 font-semibold">DGPS Field Survey (Measured)</span>
-                </div>
-              </div>
+              )}
             </div>
           )}
 

@@ -16,6 +16,7 @@ interface DTRClusterZoomWindowProps {
   showHTLines?: boolean;
   showLTLines?: boolean;
   showPoles?: boolean;
+  showDPStructures?: boolean;
   showDTRs?: boolean;
   selectedAsset?: SelectedAsset | null;
   onSelectAsset?: (asset: SelectedAsset) => void;
@@ -31,6 +32,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   showHTLines = true,
   showLTLines = true,
   showPoles = true,
+  showDPStructures = true,
   showDTRs = true,
   selectedAsset,
   onSelectAsset,
@@ -42,7 +44,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   const [showHT, setShowHT] = useState<boolean>(showHTLines);
   const [showLT, setShowLT] = useState<boolean>(showLTLines);
   const [showPolesLayer, setShowPolesLayer] = useState<boolean>(showPoles);
+  const [showDP, setShowDP] = useState<boolean>(showDPStructures);
   const [showDTRLayer, setShowDTRLayer] = useState<boolean>(showDTRs);
+
+  const [dpCount, setDpCount] = useState<number>(0);
+  const [stdPolesCount, setStdPolesCount] = useState<number>(0);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -50,6 +56,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   const clusterLayersRef = useRef<{
     lines: L.LayerGroup;
     poles: L.LayerGroup;
+    dpStructures: L.LayerGroup;
     dtr: L.LayerGroup;
   } | null>(null);
 
@@ -63,6 +70,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   useEffect(() => {
     setShowPolesLayer(showPoles);
   }, [showPoles]);
+  useEffect(() => {
+    setShowDP(showDPStructures);
+  }, [showDPStructures]);
   useEffect(() => {
     setShowDTRLayer(showDTRs);
   }, [showDTRs]);
@@ -87,6 +97,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     const dy = (lat2 - lat1) * 111000;
     const dx = (lon2 - lon1) * 111000 * Math.cos((lat1 * Math.PI) / 180);
     return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Helper to identify DP (Double-Pole) transformer mounting structure
+  const isDPSupport = (p: any): boolean => {
+    const name = p.properties.name || '';
+    const code = p.properties.code || '';
+    return name.includes('DP') || name.includes('DTR DP') || code.includes('DP') || name.includes('11kV DTR');
   };
 
   // Helper to get clean short pole code
@@ -116,7 +133,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         zoomControl: false,
         attributionControl: false,
         minZoom: 18,
-        maxZoom: 24, // Allow ultra high zoom
+        maxZoom: 24, // Allow ultra high zoom up to 24x
       }).setView(center, 21.5);
 
       let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
@@ -139,11 +156,13 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       });
 
       const linesGroup = L.layerGroup().addTo(map);
+      const dpGroup = L.layerGroup().addTo(map);
       const polesGroup = L.layerGroup().addTo(map);
       const dtrGroup = L.layerGroup().addTo(map);
 
       clusterLayersRef.current = {
         lines: linesGroup,
+        dpStructures: dpGroup,
         poles: polesGroup,
         dtr: dtrGroup,
       };
@@ -190,14 +209,15 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     tileLayerRef.current = newTileLayer;
   }, [baseMap]);
 
-  // 3. Render Cluster Features with Functional Attribute Selection & Highlighting
+  // 3. Render Cluster Features with Functional Attribute Selection & Separate DP Structure Layer
   useEffect(() => {
     if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !dtrCoords || !networkData || !dtr) return;
 
     const [dtrLat, dtrLon] = dtrCoords;
-    const { lines, poles, dtr: dtrGroup } = clusterLayersRef.current;
+    const { lines, dpStructures, poles, dtr: dtrGroup } = clusterLayersRef.current;
 
     lines.clearLayers();
+    dpStructures.clearLayers();
     poles.clearLayers();
     dtrGroup.clearLayers();
 
@@ -208,6 +228,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       const dist = getDistanceMeters(dtrLat, dtrLon, coords[1], coords[0]);
       return dist <= 85;
     });
+
+    const dpPolesList = clusterPoles.filter(isDPSupport);
+    const stdPolesList = clusterPoles.filter((p: any) => !isDPSupport(p));
+    setDpCount(dpPolesList.length);
+    setStdPolesCount(stdPolesList.length);
 
     const clusterPoleCodes = new Set(clusterPoles.map((p: any) => p.properties.code));
 
@@ -248,7 +273,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       const lengthMeters = (lineFeat.properties.length_km * 1000).toFixed(0);
 
-      // Fast hover tooltip
       polyline.bindTooltip(
         `
         <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
@@ -261,7 +285,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         { sticky: true, opacity: 0.95 }
       );
 
-      // Persistent click popup with attribute selection
       const linePopupHtml = `
         <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
           <div style="font-size: 10px; font-weight: 700; color: ${isHT ? '#ef4444' : '#38bdf8'}; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
@@ -280,7 +303,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       polyline.bindPopup(linePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
 
-      // Click to select attribute
       polyline.on('click', () => {
         if (onSelectAsset) {
           onSelectAsset({
@@ -298,32 +320,108 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       lines.addLayer(polyline);
     });
 
-    // D. Render Cluster Poles (respecting showPolesLayer attribute toggle)
-    if (showPolesLayer) {
-      clusterPoles.forEach((poleFeat: any) => {
+    // D1. Render DP STRUCTURES (Substation Double-Pole Mounting Structure)
+    if (showDP) {
+      dpPolesList.forEach((poleFeat: any) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
         const pLat = coords[1];
         const pLon = coords[0];
         const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
         const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
-        const isDP = shortCode === 'DP-Structure';
+        const isSelected = selectedAsset?.code === poleFeat.properties.code;
+
+        const dpBadgeIcon = L.divIcon({
+          className: 'cluster-dp-badge-icon',
+          html: `
+            <div style="display: flex; align-items: center; gap: 5px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
+              <div style="width: 18px; height: 18px; border-radius: 4px; background: ${
+                isSelected ? '#38bdf8' : '#ea580c'
+              }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fed7aa'}; box-shadow: 0 0 14px ${
+                isSelected ? '#38bdf8' : '#ea580c'
+              }; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 5px; height: 5px; background: #ffffff; border-radius: 50%;"></div>
+              </div>
+              <span style="background: ${
+                isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(124, 45, 18, 0.92)'
+              }; color: ${isSelected ? '#ffffff' : '#fed7aa'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1.5px solid ${
+                isSelected ? '#38bdf8' : '#ea580c'
+              }; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">
+                ⚡ ${shortCode} (${distM}m)
+              </span>
+            </div>
+          `,
+          iconSize: [120, 24],
+          iconAnchor: [9, 9],
+        });
+
+        const marker = L.marker([pLat, pLon], { icon: dpBadgeIcon });
+
+        const dpPopupHtml = `
+          <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 270px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="font-size: 10px; font-weight: 700; color: #fb923c; text-transform: uppercase; border-bottom: 1px solid #7c2d12; padding-bottom: 4px; margin-bottom: 6px;">
+              ⚡ 11 kV Double-Pole (DP) Gantry Structure
+            </div>
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
+            <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
+              <div>Asset Code: <b style="color: #fed7aa">${poleFeat.properties.code}</b></div>
+              <div>Distance from DTR Center: <b>${distM} meters</b></div>
+              <div>Operating Voltage: <b>11 kV Primary / 415 V Sec</b></div>
+              <div>Mounts: <b>DTR + DO Fuses + AB Switchgear + LA</b></div>
+              <div>Earthing: <b style="color: #34d399">IS 3043 Neutral & Body Double Pipe</b></div>
+              <div>Provenance: <b style="color: #38bdf8">${poleFeat.properties.provenance}</b></div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(dpPopupHtml, { maxWidth: 290, autoPan: false, closeButton: true });
+
+        marker.on('click', () => {
+          if (onSelectAsset) {
+            onSelectAsset({
+              id: poleFeat.properties.id,
+              code: poleFeat.properties.code,
+              name: poleFeat.properties.name,
+              entity_type: 'pole',
+              provenance: poleFeat.properties.provenance,
+              confidence_score: poleFeat.properties.confidence_score,
+              properties: {
+                ...poleFeat.properties,
+                is_dp_structure: true,
+              },
+            });
+          }
+        });
+
+        dpStructures.addLayer(marker);
+      });
+    }
+
+    // D2. Render STANDARD DISTRIBUTION SUPPORT POLES
+    if (showPolesLayer) {
+      stdPolesList.forEach((poleFeat: any) => {
+        const coords = poleFeat.geometry?.coordinates;
+        if (!coords) return;
+        const pLat = coords[1];
+        const pLon = coords[0];
+        const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
+        const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
         const isSelected = selectedAsset?.code === poleFeat.properties.code;
 
         const poleBadgeIcon = L.divIcon({
           className: 'cluster-pole-badge-icon',
           html: `
             <div style="display: flex; align-items: center; gap: 4px; pointer-events: auto; cursor: pointer; white-space: nowrap;">
-              <div style="width: ${isDP ? '15px' : '12px'}; height: ${isDP ? '15px' : '12px'}; border-radius: 50%; background: ${
-            isSelected ? '#38bdf8' : isDP ? '#ea580c' : '#854d0e'
-          }; border: 2.5px solid ${isSelected ? '#ffffff' : isDP ? '#f97316' : '#fde047'}; box-shadow: 0 0 12px ${
-            isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
-          };"></div>
+              <div style="width: 12px; height: 12px; border-radius: 50%; background: ${
+                isSelected ? '#38bdf8' : '#854d0e'
+              }; border: 2.5px solid ${isSelected ? '#ffffff' : '#fde047'}; box-shadow: 0 0 10px ${
+                isSelected ? '#38bdf8' : 'rgba(0,0,0,0.8)'
+              };"></div>
               <span style="background: ${
                 isSelected ? 'rgba(14, 165, 233, 0.95)' : 'rgba(15, 23, 42, 0.92)'
-              }; color: ${isSelected ? '#ffffff' : isDP ? '#fdba74' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${
-            isSelected ? '#38bdf8' : isDP ? '#ea580c' : '#78350f'
-          }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
+              }; color: ${isSelected ? '#ffffff' : '#fef08a'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; border: 1px solid ${
+                isSelected ? '#38bdf8' : '#78350f'
+              }; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">
                 ${shortCode} (${distM}m)
               </span>
             </div>
@@ -337,7 +435,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         const polePopupHtml = `
           <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 250px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
             <div style="font-size: 10px; font-weight: 700; color: #f59e0b; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
-              Support Structure
+              Distribution Support Pole
             </div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
             <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
@@ -351,7 +449,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
         marker.bindPopup(polePopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
 
-        // Click to select attribute
         marker.on('click', () => {
           if (onSelectAsset) {
             onSelectAsset({
@@ -361,7 +458,10 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               entity_type: 'pole',
               provenance: poleFeat.properties.provenance,
               confidence_score: poleFeat.properties.confidence_score,
-              properties: poleFeat.properties,
+              properties: {
+                ...poleFeat.properties,
+                is_dp_structure: false,
+              },
             });
           }
         });
@@ -410,7 +510,6 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       dtrMarker.bindPopup(dtrPopupHtml, { maxWidth: 280, autoPan: false, closeButton: true });
 
-      // Click to select attribute
       dtrMarker.on('click', () => {
         if (onSelectAsset) {
           onSelectAsset(dtr);
@@ -419,7 +518,19 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       dtrGroup.addLayer(dtrMarker);
     }
-  }, [isOpen, dtrCoords?.[0], dtrCoords?.[1], networkData, baseMap, showHT, showLT, showPolesLayer, showDTRLayer, selectedAsset?.code]);
+  }, [
+    isOpen,
+    dtrCoords?.[0],
+    dtrCoords?.[1],
+    networkData,
+    baseMap,
+    showHT,
+    showLT,
+    showDP,
+    showPolesLayer,
+    showDTRLayer,
+    selectedAsset?.code,
+  ]);
 
   if (!isOpen || !dtr) return null;
 
@@ -434,8 +545,8 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         isExpanded
           ? 'inset-6 z-[2500]'
           : isDrawerOpen
-          ? 'bottom-6 right-[404px] w-[520px] h-[490px] z-[1500]'
-          : 'bottom-6 right-6 w-[520px] h-[490px] z-[1500]'
+          ? 'bottom-6 right-[404px] w-[530px] h-[500px] z-[1500]'
+          : 'bottom-6 right-6 w-[530px] h-[500px] z-[1500]'
       } bg-slate-900/98 border border-pink-500/50 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
     >
       {/* Header Bar */}
@@ -528,10 +639,37 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         </div>
       </div>
 
-      {/* Layer/Attribute Visibility Toolbar within Zoom Window */}
-      <div className="px-4 py-1.5 bg-slate-950/70 border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
-        <div className="flex items-center space-x-1.5">
-          <span className="text-slate-500 uppercase text-[9px] mr-1">Layer Attributes:</span>
+      {/* Attribute Selector Toolbar within Zoom Window (with dedicated DP Structure selector) */}
+      <div className="px-4 py-2 bg-slate-950/75 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono">
+        <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+          <span className="text-slate-500 uppercase text-[9px] mr-1">Attribute Selectors:</span>
+          {/* DP Structure Attribute Selector Button */}
+          <button
+            onClick={() => setShowDP(!showDP)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showDP
+                ? 'bg-orange-500/25 text-orange-200 border border-orange-500/60 shadow-sm'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle 11 kV DP (Double-Pole) Transformer Gantry Structure"
+          >
+            <span className="w-2 h-2 rounded-xs bg-orange-500 inline-block border border-orange-300" />
+            <span className="font-bold">⚡ DP Structure ({dpCount})</span>
+          </button>
+
+          <button
+            onClick={() => setShowPolesLayer(!showPolesLayer)}
+            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
+              showPolesLayer
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
+            }`}
+            title="Toggle Distribution Support Poles"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span>Poles ({stdPolesCount})</span>
+          </button>
+
           <button
             onClick={() => setShowHT(!showHT)}
             className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
@@ -544,6 +682,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             <span>11kV HT</span>
           </button>
+
           <button
             onClick={() => setShowLT(!showLT)}
             className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
@@ -556,18 +695,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
             <span>415V LT</span>
           </button>
-          <button
-            onClick={() => setShowPolesLayer(!showPolesLayer)}
-            className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
-              showPolesLayer
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
-            }`}
-            title="Toggle Support Poles & DP Structure"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            <span>Poles</span>
-          </button>
+
           <button
             onClick={() => setShowDTRLayer(!showDTRLayer)}
             className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
@@ -581,7 +709,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <span>DTR Center</span>
           </button>
         </div>
-        <div className="text-[10px] text-slate-500">
+        <div className="text-[10px] text-slate-400">
           Selected: <b className="text-cyan-300">{selectedAsset?.name || selectedAsset?.code || 'None'}</b>
         </div>
       </div>
@@ -603,12 +731,12 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             {loadingPct}% {isOverloaded ? '(Overloaded)' : '(Optimal)'}
           </span>
           <span className="text-slate-600">&bull;</span>
-          <span className="text-slate-400">Stepdown:</span>
-          <span className="text-cyan-400 font-semibold">11 kV &rarr; 415 V</span>
+          <span className="text-slate-400">Mount:</span>
+          <span className="text-orange-400 font-semibold">11 kV DP Gantry (PSC 9m)</span>
         </div>
         <div className="text-[10px] text-slate-400 flex items-center space-x-1">
           <Info className="w-3 h-3 text-cyan-400" />
-          <span>Click any line, pole, or DTR to inspect attributes</span>
+          <span>Click DP structure or lines to inspect attributes</span>
         </div>
       </div>
     </div>

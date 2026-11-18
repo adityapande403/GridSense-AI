@@ -61,6 +61,7 @@ export const NetworkMap: React.FC = () => {
   const [showLTLines, setShowLTLines] = useState<boolean>(true);
   const [showDTRs, setShowDTRs] = useState<boolean>(true);
   const [showPoles, setShowPoles] = useState<boolean>(true);
+  const [showDPStructures, setShowDPStructures] = useState<boolean>(true);
   const [showSwitches, setShowSwitches] = useState<boolean>(true);
   const [showConsumers, setShowConsumers] = useState<boolean>(false);
 
@@ -375,39 +376,53 @@ export const NetworkMap: React.FC = () => {
       });
     }
 
-    // B. Render Physical Poles & Support Structures (matching brown dots in QGIS)
-    if (showPoles && data.poles?.features) {
+    // B. Render Physical Poles & Support Structures (distinguishing DP substation structures from standard poles)
+    if ((showPoles || showDPStructures) && data.poles?.features) {
       data.poles.features.forEach((poleFeat) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
         const lat = coords[1];
         const lon = coords[0];
 
+        const isDP =
+          poleFeat.properties.name?.includes('DP') ||
+          poleFeat.properties.code?.includes('DP') ||
+          poleFeat.properties.name?.includes('11kV DTR');
+
+        if (isDP && !showDPStructures) return;
+        if (!isDP && !showPoles) return;
+
         const circleMarker = L.circleMarker([lat, lon], {
-          radius: 4.0,
-          fillColor: '#854d0e', // Brown dot as in QGIS
-          color: '#451a03',
-          weight: 1.5,
-          opacity: 0.9,
-          fillOpacity: 0.9,
+          radius: isDP ? 5.5 : 4.0,
+          fillColor: isDP ? '#ea580c' : '#854d0e', // Orange for DP Structure, Brown for standard pole
+          color: isDP ? '#ffedd5' : '#451a03',
+          weight: isDP ? 2.5 : 1.5,
+          opacity: 0.95,
+          fillOpacity: 0.95,
         });
 
         circleMarker.bindTooltip(
           `
-          <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid #78350f;">
-            <div style="font-weight: bold; color: #fde047;">${poleFeat.properties.name || poleFeat.properties.code}</div>
-            <div>Voltage: ${poleFeat.properties.voltage_level_kv} kV</div>
-            <div style="font-size: 9px; color: #94a3b8;">Physical Support Structure</div>
+          <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid ${
+            isDP ? '#ea580c' : '#78350f'
+          };">
+            <div style="font-weight: bold; color: ${isDP ? '#fb923c' : '#fde047'};">${
+            isDP ? '⚡ ' + (poleFeat.properties.name || poleFeat.properties.code) : poleFeat.properties.name || poleFeat.properties.code
+          }</div>
+            <div>${isDP ? '11 kV DP Substation Gantry' : 'Support Structure'} &bull; ${poleFeat.properties.voltage_level_kv || 0.415} kV</div>
+            <div style="font-size: 9px; color: #94a3b8;">${isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Physical Support Structure'}</div>
           </div>
           `,
           { direction: 'top', offset: [0, -5], opacity: 1 }
         );
 
         const polePopupHtml = `
-          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 260px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 270px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
-              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #f59e0b;">
-                SUPPORT STRUCTURE
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${
+                isDP ? '#fb923c' : '#f59e0b'
+              };">
+                ${isDP ? '⚡ 11 kV DP GANTRY STRUCTURE' : 'SUPPORT STRUCTURE'}
               </span>
               <span style="font-size: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 4px;">
                 ${poleFeat.properties.voltage_level_kv || 0.415} kV
@@ -419,13 +434,14 @@ export const NetworkMap: React.FC = () => {
             <div style="font-size: 11px; color: #cbd5e1; space-y: 4px;">
               <div>Asset Code: <b style="color: #f1f5f9;">${poleFeat.properties.code}</b></div>
               <div>Coordinates: <b>${lat.toFixed(5)}, ${lon.toFixed(5)}</b></div>
+              <div>Type: <b>${isDP ? 'Double-Pole (PSC 9m Gantry)' : 'Single Pole Structure'}</b></div>
               <div>Provenance: <b style="color: #38bdf8;">${poleFeat.properties.provenance}</b></div>
             </div>
           </div>
         `;
 
         circleMarker.bindPopup(polePopupHtml, {
-          maxWidth: 280,
+          maxWidth: 290,
           autoPan: false,
           closeButton: true,
         });
@@ -438,7 +454,10 @@ export const NetworkMap: React.FC = () => {
             entity_type: 'pole',
             provenance: poleFeat.properties.provenance,
             confidence_score: poleFeat.properties.confidence_score,
-            properties: poleFeat.properties,
+            properties: {
+              ...poleFeat.properties,
+              is_dp_structure: isDP,
+            },
           });
         });
 
@@ -731,7 +750,7 @@ export const NetworkMap: React.FC = () => {
         dtrs.addLayer(marker);
       });
     }
-  }, [data, showSubstations, showHTLines, showLTLines, showPoles, showDTRs, showSwitches, showConsumers, baseMap]);
+  }, [data, showSubstations, showHTLines, showLTLines, showPoles, showDPStructures, showDTRs, showSwitches, showConsumers, baseMap]);
 
   // Zoom controls
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
@@ -905,7 +924,17 @@ export const NetworkMap: React.FC = () => {
               className="rounded bg-slate-800 border-slate-700 text-amber-600 focus:ring-0"
             />
             <span className="w-2 h-2 rounded-full bg-amber-700 inline-block border border-amber-950" />
-            <span>Poles & Structures ({data?.summary?.total_poles || 608})</span>
+            <span>Poles ({data?.summary?.total_poles || 608})</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={showDPStructures}
+              onChange={(e) => setShowDPStructures(e.target.checked)}
+              className="rounded bg-slate-800 border-slate-700 text-orange-500 focus:ring-0"
+            />
+            <span className="w-2.5 h-2.5 rounded-xs bg-orange-600 inline-block border border-orange-400" />
+            <span>⚡ DP Structures (13)</span>
           </label>
           <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
             <input
@@ -998,6 +1027,7 @@ export const NetworkMap: React.FC = () => {
           showHTLines={showHTLines}
           showLTLines={showLTLines}
           showPoles={showPoles}
+          showDPStructures={showDPStructures}
           showDTRs={showDTRs}
           selectedAsset={selectedAsset}
           onSelectAsset={(asset) => setSelectedAsset(asset)}
