@@ -106,7 +106,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
 
   return (
     <>
-      <div className="absolute right-0 top-0 bottom-0 w-96 bg-slate-900/95 border-l border-slate-800 shadow-2xl backdrop-blur-md z-30 flex flex-col animate-in slide-in-from-right duration-200">
+      <div className="absolute right-0 top-0 bottom-0 w-96 bg-slate-900 border-l border-slate-800 shadow-2xl backdrop-blur-md z-[2000] flex flex-col animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center space-x-3">
@@ -277,6 +277,30 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
                 <div className="flex justify-between py-1">
                   <span className="text-slate-400">Breaking Capacity:</span>
                   <span className="text-slate-200">{props.breaking_capacity_ka || 12.5} kA</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pole Specific Metrics */}
+          {asset.entity_type === 'pole' && (
+            <div className="space-y-4">
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Structure Type:</span>
+                  <span className="text-amber-400 font-semibold">{props.name || 'Support Pole (PSC)'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Asset Code:</span>
+                  <span className="text-slate-200 font-bold">{props.code}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Operating Voltage:</span>
+                  <span className="text-slate-200">{props.voltage_level_kv || 0.415} kV</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400">Survey Method:</span>
+                  <span className="text-emerald-400 font-semibold">DGPS Field Survey (Measured)</span>
                 </div>
               </div>
             </div>

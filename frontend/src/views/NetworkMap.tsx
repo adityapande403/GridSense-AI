@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 
+const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
+
 interface NetworkGeoJSONResponse {
   feeders: Array<{ code: string; name: string; voltage_kv: number; trunk_conductor: string; provenance: any }>;
   substations: { type: string; features: any[] };
@@ -40,14 +42,14 @@ interface NetworkGeoJSONResponse {
   center: [number, number];
 }
 
-type BaseMapType = 'osm' | 'dark' | 'satellite';
+type BaseMapType = 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
 
 export const NetworkMap: React.FC = () => {
   const [data, setData] = useState<NetworkGeoJSONResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFeeder, setSelectedFeeder] = useState<string>('2011951');
-  const [baseMap, setBaseMap] = useState<BaseMapType>('osm');
+  const [baseMap, setBaseMap] = useState<BaseMapType>('carto-voyager');
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
 
   // Layer visibility toggles (matching QGIS layers)
@@ -62,6 +64,7 @@ export const NetworkMap: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const activePolylineRef = useRef<L.Polyline | null>(null);
   const layerGroupsRef = useRef<{
     substations: L.LayerGroup;
     htLines: L.LayerGroup;
@@ -83,12 +86,12 @@ export const NetworkMap: React.FC = () => {
       maxZoom: 20,
     }).setView([11.2687, 75.7665], 16);
 
-    // Initial tile layer: OpenStreetMap Standard (as requested)
+    // Initial tile layer: Carto Voyager raster tiles with user's API key
     const tileLayer = L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`,
       {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        subdomains: 'abc',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         maxZoom: 20,
       }
     ).addTo(map);
@@ -128,17 +131,27 @@ export const NetworkMap: React.FC = () => {
 
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
 
-    let url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-    let attr = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    let url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+    let attr =
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
     let sub = 'abc';
 
-    if (baseMap === 'dark') {
-      url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    if (baseMap === 'carto-voyager') {
+      url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
       attr = '&copy; OpenStreetMap contributors &copy; CARTO';
-      sub = 'abcd';
+      sub = 'abc';
+    } else if (baseMap === 'carto-dark') {
+      url = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+      attr = '&copy; OpenStreetMap contributors &copy; CARTO';
+      sub = 'abc';
+    } else if (baseMap === 'osm') {
+      url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      attr = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+      sub = 'abc';
     } else if (baseMap === 'satellite') {
       url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      attr = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
+      attr =
+        'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
       sub = 'abc';
     }
 
@@ -176,7 +189,21 @@ export const NetworkMap: React.FC = () => {
     fetchNetworkData(selectedFeeder);
   }, [selectedFeeder]);
 
-  // 4. Render GeoJSON Assets onto Leaflet Layers
+  // 4. Dedicated Fit Bounds: ONLY runs when new feeder data bounds load, NEVER on asset selection!
+  useEffect(() => {
+    if (!data?.bounds || !mapInstanceRef.current || data.bounds.length !== 2) return;
+    const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+    mapInstanceRef.current.fitBounds(
+      [
+        [minLat, minLon],
+        [maxLat, maxLon],
+      ],
+      { padding: [40, 40], maxZoom: 17, animate: true }
+    );
+  }, [data?.bounds]);
+
+  // 5. Render GeoJSON Assets onto Leaflet Layers
+  // NOTE: selectedAsset is intentionally OMITTED from dependencies so clicking assets never wipes layers or re-triggers bounds!
   useEffect(() => {
     if (!data || !layerGroupsRef.current || !mapInstanceRef.current) return;
 
@@ -190,6 +217,9 @@ export const NetworkMap: React.FC = () => {
     dtrs.clearLayers();
     switches.clearLayers();
     consumers.clearLayers();
+    activePolylineRef.current = null;
+
+    const isDarkTheme = baseMap === 'carto-dark';
 
     // A. Render 11 kV HT Lines (Primary Backbone) and LT Lines/Cables (Secondary Distribution)
     if (data.lines?.features) {
@@ -203,24 +233,27 @@ export const NetworkMap: React.FC = () => {
 
         const latlngs = coords.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
         const isOperational = lineFeat.properties.is_operational !== false;
-        const isSelected = selectedAsset?.code === lineFeat.properties.code;
 
         // Distinct styling for HT Backbone vs LT Lines (matching QGIS)
-        const lineColor = isSelected
-          ? '#38bdf8'
-          : isHT
-          ? (baseMap === 'dark' ? '#06b6d4' : '#dc2626') // Red in OSM/Light, Cyan in Dark
-          : (baseMap === 'dark' ? '#94a3b8' : '#334155'); // Slate/Dark Charcoal for LT
+        const defaultColor = isHT
+          ? (isDarkTheme ? '#06b6d4' : '#dc2626') // Red in Light/Voyager/OSM, Cyan in Dark
+          : (isDarkTheme ? '#94a3b8' : '#334155'); // Slate/Dark Charcoal for LT
+        const defaultWeight = isHT ? 4.0 : 2.0;
 
         const polyline = L.polyline(latlngs, {
-          color: lineColor,
-          weight: isSelected ? 5.5 : isHT ? 4.0 : 2.0,
+          color: defaultColor,
+          weight: defaultWeight,
           opacity: isHT ? 0.95 : 0.75,
           dashArray: isOperational ? undefined : '5, 5',
           lineCap: 'round',
           lineJoin: 'round',
         });
 
+        (polyline as any)._isHT = isHT;
+        (polyline as any)._defaultColor = defaultColor;
+        (polyline as any)._defaultWeight = defaultWeight;
+
+        // Fast Hover Tooltip
         polyline.bindTooltip(
           `
           <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
@@ -229,16 +262,97 @@ export const NetworkMap: React.FC = () => {
             </div>
             <div>Code: <b>${lineFeat.properties.code}</b></div>
             <div>Conductor: <b>${lineFeat.properties.conductor_type || 'ACSR'}</b></div>
-            <div>Voltage: <b>${lineFeat.properties.voltage_kv} kV</b></div>
-            <div>Length: <b>${lineFeat.properties.length_km} km</b></div>
-            <div>Loading: <b>${lineFeat.properties.loading_pct}%</b></div>
-            <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">From: ${lineFeat.properties.from_bus_code} &rarr; To: ${lineFeat.properties.to_bus_code}</div>
+            <div>Voltage: <b>${lineFeat.properties.voltage_kv} kV</b> &bull; Length: <b>${lineFeat.properties.length_km} km</b></div>
+            <div style="font-size: 9px; color: #38bdf8; margin-top: 4px;">Click to inspect details & calculation</div>
           </div>
           `,
-          { sticky: true, opacity: 1 }
+          { sticky: true, opacity: 0.95 }
         );
 
-        polyline.on('click', () => {
+        // Persistent Click Popup Window (Stays open, cannot be accidentally closed by mousemove)
+        const popupContent = `
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 270px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: ${isHT ? '#ef4444' : '#38bdf8'};">
+                ${isHT ? '11 kV HT Backbone' : 'LT Distribution Line'}
+              </span>
+              <span style="font-size: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 1px 6px; border-radius: 4px;">
+                ${lineFeat.properties.voltage_kv} kV
+              </span>
+            </div>
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 8px; word-break: break-all;">
+              ${lineFeat.properties.code}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #cbd5e1; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Conductor:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">${lineFeat.properties.conductor_type || 'ACSR_Weasel'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Length:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">${lineFeat.properties.length_km} km</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Loading:</span>
+                <span style="font-weight: 600; color: ${lineFeat.properties.loading_pct > 100 ? '#f87171' : lineFeat.properties.loading_pct > 80 ? '#fbbf24' : '#34d399'};">
+                  ${lineFeat.properties.loading_pct}%
+                </span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Current Status:</span>
+                <span style="color: ${isOperational ? '#34d399' : '#f87171'}; font-weight: 600;">
+                  ${isOperational ? 'Energized' : 'De-energized'}
+                </span>
+              </div>
+            </div>
+            <div style="font-size: 9px; color: #64748b; border-top: 1px solid #1e293b; padding-top: 6px;">
+              From: <b>${lineFeat.properties.from_bus_code}</b> &rarr; To: <b>${lineFeat.properties.to_bus_code}</b>
+            </div>
+          </div>
+        `;
+
+        polyline.bindPopup(popupContent, {
+          maxWidth: 320,
+          minWidth: 260,
+          autoPan: false,
+          closeButton: true,
+          className: 'grid-line-popup',
+        });
+
+        // Hover Effect: Thicken line for immediate visual feedback and effortless clickability
+        polyline.on('mouseover', function (this: L.Polyline) {
+          if (activePolylineRef.current !== this) {
+            this.setStyle({
+              weight: isHT ? 6.0 : 4.0,
+              opacity: 1.0,
+            });
+          }
+        });
+
+        polyline.on('mouseout', function (this: L.Polyline) {
+          if (activePolylineRef.current !== this) {
+            this.setStyle({
+              weight: defaultWeight,
+              opacity: isHT ? 0.95 : 0.75,
+            });
+          }
+        });
+
+        // Click Handler: Highlight active line, open popup & open inspection drawer
+        polyline.on('click', function (this: L.Polyline) {
+          if (activePolylineRef.current && activePolylineRef.current !== this) {
+            const prev = activePolylineRef.current;
+            prev.setStyle({
+              color: (prev as any)._defaultColor,
+              weight: (prev as any)._defaultWeight,
+            });
+          }
+          activePolylineRef.current = this;
+          this.setStyle({
+            color: '#38bdf8',
+            weight: 6.0,
+          });
+
           setSelectedAsset({
             id: lineFeat.properties.id,
             code: lineFeat.properties.code,
@@ -267,7 +381,7 @@ export const NetworkMap: React.FC = () => {
         const lon = coords[0];
 
         const circleMarker = L.circleMarker([lat, lon], {
-          radius: 3.5,
+          radius: 4.0,
           fillColor: '#854d0e', // Brown dot as in QGIS
           color: '#451a03',
           weight: 1.5,
@@ -285,6 +399,33 @@ export const NetworkMap: React.FC = () => {
           `,
           { direction: 'top', offset: [0, -5], opacity: 1 }
         );
+
+        const polePopupHtml = `
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 260px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #f59e0b;">
+                SUPPORT STRUCTURE
+              </span>
+              <span style="font-size: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 4px;">
+                ${poleFeat.properties.voltage_level_kv || 0.415} kV
+              </span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">
+              ${poleFeat.properties.name || poleFeat.properties.code}
+            </div>
+            <div style="font-size: 11px; color: #cbd5e1; space-y: 4px;">
+              <div>Asset Code: <b style="color: #f1f5f9;">${poleFeat.properties.code}</b></div>
+              <div>Coordinates: <b>${lat.toFixed(5)}, ${lon.toFixed(5)}</b></div>
+              <div>Provenance: <b style="color: #38bdf8;">${poleFeat.properties.provenance}</b></div>
+            </div>
+          </div>
+        `;
+
+        circleMarker.bindPopup(polePopupHtml, {
+          maxWidth: 280,
+          autoPan: false,
+          closeButton: true,
+        });
 
         circleMarker.on('click', () => {
           setSelectedAsset({
@@ -337,6 +478,38 @@ export const NetworkMap: React.FC = () => {
           { direction: 'top', offset: [0, -14], opacity: 1 }
         );
 
+        const subPopupHtml = `
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 280px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #c084fc;">
+                PRIMARY SUBSTATION
+              </span>
+              <span style="font-size: 10px; background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.4); padding: 1px 6px; border-radius: 4px;">
+                ${subFeat.properties.nominal_kv} kV
+              </span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">
+              ${subFeat.properties.name || subFeat.properties.code}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #cbd5e1;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Transformer Rating:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">${subFeat.properties.ptr_capacity_mva} MVA</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Feeder Count:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">${subFeat.properties.feeder_count || 3}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(subPopupHtml, {
+          maxWidth: 300,
+          autoPan: false,
+          closeButton: true,
+        });
+
         marker.on('click', () => {
           setSelectedAsset({
             id: subFeat.properties.id,
@@ -387,7 +560,7 @@ export const NetworkMap: React.FC = () => {
         marker.bindTooltip(
           `
           <div style="background: #0f172a; color: #f8fafc; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 11px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-            <div style="font-weight: bold; color: ${isNormallyOpen ? '#fb923c' : (isClosed ? '#34d399' : '#f87171')};">
+            <div style="font-weight: bold; color: ${isNormallyOpen ? '#fb923c' : isClosed ? '#34d399' : '#f87171'};">
               ${isNormallyOpen ? 'OPEN TIE SWITCH' : `SWITCH (${swFeat.properties.current_status.toUpperCase()})`}
             </div>
             <div>Code: <b>${swFeat.properties.code}</b></div>
@@ -397,6 +570,44 @@ export const NetworkMap: React.FC = () => {
           `,
           { direction: 'top', offset: [0, -8], opacity: 1 }
         );
+
+        const swPopupHtml = `
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 280px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${isNormallyOpen ? '#fb923c' : '#34d399'};">
+                ${isNormallyOpen ? 'NORMALLY OPEN TIE' : 'FEEDER SECTIONALIZER'}
+              </span>
+              <span style="font-size: 10px; background: rgba(251, 146, 60, 0.15); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.4); padding: 1px 6px; border-radius: 4px;">
+                ${swFeat.properties.switch_type.toUpperCase()}
+              </span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">
+              ${swFeat.properties.code}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #cbd5e1;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Status:</span>
+                <span style="font-weight: 700; color: ${isClosed ? '#34d399' : '#f87171'};">${swFeat.properties.current_status.toUpperCase()}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Remotely Operable:</span>
+                <span style="font-weight: 600; color: ${swFeat.properties.is_motorized ? '#38bdf8' : '#94a3b8'};">
+                  ${swFeat.properties.is_motorized ? 'Yes (Motorized RMU)' : 'Manual Field Crew'}
+                </span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Interrupting Capacity:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">${swFeat.properties.breaking_capacity_ka || 12.5} kA</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(swPopupHtml, {
+          maxWidth: 300,
+          autoPan: false,
+          closeButton: true,
+        });
 
         marker.on('click', () => {
           setSelectedAsset({
@@ -414,7 +625,7 @@ export const NetworkMap: React.FC = () => {
       });
     }
 
-    // E. Render Distribution Transformers (DTRs - Pink/Magenta glowing badges matching QGIS)
+    // E. Render Distribution Transformers (DTRs - Pink/Magenta badges matching QGIS)
     if (showDTRs && data.transformers?.features) {
       data.transformers.features.forEach((dtrFeat) => {
         const coords = dtrFeat.geometry?.coordinates;
@@ -425,7 +636,7 @@ export const NetworkMap: React.FC = () => {
         const loadingPct = dtrFeat.properties.loading_pct || 72.0;
         const isOverloaded = loadingPct > 100.0;
         const isWarning = loadingPct > 80.0 && !isOverloaded;
-        const color = isOverloaded ? '#ef4444' : (isWarning ? '#f59e0b' : '#ec4899'); // Pink like in QGIS, red if overloaded
+        const color = isOverloaded ? '#ef4444' : isWarning ? '#f59e0b' : '#ec4899'; // Pink like in QGIS, red if overloaded
 
         const dtrIcon = L.divIcon({
           className: 'custom-dtr-icon',
@@ -459,6 +670,42 @@ export const NetworkMap: React.FC = () => {
           { direction: 'top', offset: [0, -12], opacity: 1 }
         );
 
+        const dtrPopupHtml = `
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 280px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #f472b6;">
+                DISTRIBUTION TRANSFORMER
+              </span>
+              <span style="font-size: 10px; background: rgba(244, 114, 182, 0.15); color: #f472b6; border: 1px solid rgba(244, 114, 182, 0.4); padding: 1px 6px; border-radius: 4px;">
+                ${dtrFeat.properties.rated_kva} kVA
+              </span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">
+              ${dtrFeat.properties.name || dtrFeat.properties.code}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #cbd5e1;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Calculated Loading:</span>
+                <span style="font-weight: 700; color: ${color};">${loadingPct}%</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Phase Configuration:</span>
+                <span style="font-weight: 600; color: #f1f5f9;">3-Phase (11 kV / 415 V)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Provenance:</span>
+                <span style="font-weight: 600; color: #38bdf8;">${dtrFeat.properties.provenance}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(dtrPopupHtml, {
+          maxWidth: 300,
+          autoPan: false,
+          closeButton: true,
+        });
+
         marker.on('click', () => {
           setSelectedAsset({
             id: dtrFeat.properties.id,
@@ -474,19 +721,7 @@ export const NetworkMap: React.FC = () => {
         dtrs.addLayer(marker);
       });
     }
-
-    // F. Smooth Fit Bounds to Active Feeder
-    if (data.bounds && data.bounds.length === 2) {
-      const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
-      mapInstanceRef.current.fitBounds(
-        [
-          [minLat, minLon],
-          [maxLat, maxLon],
-        ],
-        { padding: [40, 40], maxZoom: 17, animate: true }
-      );
-    }
-  }, [data, showSubstations, showHTLines, showLTLines, showPoles, showDTRs, showSwitches, showConsumers, baseMap, selectedAsset]);
+  }, [data, showSubstations, showHTLines, showLTLines, showPoles, showDTRs, showSwitches, showConsumers, baseMap]);
 
   // Zoom controls
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
@@ -502,6 +737,17 @@ export const NetworkMap: React.FC = () => {
         { padding: [40, 40], maxZoom: 17, animate: true }
       );
     }
+  };
+
+  const handleCloseDrawer = () => {
+    if (activePolylineRef.current) {
+      activePolylineRef.current.setStyle({
+        color: (activePolylineRef.current as any)._defaultColor,
+        weight: (activePolylineRef.current as any)._defaultWeight,
+      });
+      activePolylineRef.current = null;
+    }
+    setSelectedAsset(null);
   };
 
   return (
@@ -528,22 +774,31 @@ export const NetworkMap: React.FC = () => {
           {/* Base Map Style Selector */}
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs font-medium">
             <button
+              onClick={() => setBaseMap('carto-voyager')}
+              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'carto-voyager' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Carto Voyager</span>
+            </button>
+            <button
+              onClick={() => setBaseMap('carto-dark')}
+              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
+                baseMap === 'carto-dark' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>Carto Dark</span>
+            </button>
+            <button
               onClick={() => setBaseMap('osm')}
               className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
                 baseMap === 'osm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>OSM Streets (Default)</span>
-            </button>
-            <button
-              onClick={() => setBaseMap('dark')}
-              className={`px-3 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'dark' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Carto Dark</span>
+              <span>OSM Streets</span>
             </button>
             <button
               onClick={() => setBaseMap('satellite')}
@@ -723,7 +978,7 @@ export const NetworkMap: React.FC = () => {
         </div>
 
         {/* Slide-in Asset Inspection Drawer */}
-        <AssetInspectionDrawer asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
+        <AssetInspectionDrawer asset={selectedAsset} onClose={handleCloseDrawer} />
       </div>
     </div>
   );

@@ -8,3 +8,46 @@ body {
   background-color: #090d16;
   color: #f1f5f9;
 }
+
+/* Custom Dark-Themed Leaflet Popups (Elevation & Transparency Fix) */
+.leaflet-popup-content-wrapper {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 8px 8px 0 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 16px !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #ffffff !important;
+}
+
+/* Ensure Leaflet popup pane is cleanly elevated above lines and markers */
+.leaflet-pane.leaflet-popup-pane {
+  z-index: 1000 !important;
+}
+
+.leaflet-pane.leaflet-tooltip-pane {
+  z-index: 950 !important;
+}
+
