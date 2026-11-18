@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, Navigation, Zap, Info } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, Navigation, Zap, Info, Layers } from 'lucide-react';
 import { SelectedAsset } from './AssetInspectionDrawer';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
@@ -9,7 +9,8 @@ const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
 interface DTRClusterZoomWindowProps {
   isOpen: boolean;
   onClose: () => void;
-  dtr: SelectedAsset | null;
+  dtr?: SelectedAsset | null;
+  clusterAsset?: SelectedAsset | null;
   networkData: any;
   baseMap: 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
   isDrawerOpen?: boolean;
@@ -26,6 +27,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   isOpen,
   onClose,
   dtr,
+  clusterAsset,
   networkData,
   baseMap,
   isDrawerOpen = true,
@@ -77,20 +79,35 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     setShowDTRLayer(showDTRs);
   }, [showDTRs]);
 
-  // Extract DTR Coordinates
-  const getDTRCoords = (): [number, number] | null => {
-    if (!dtr) return null;
-    const props = dtr.properties || {};
+  const targetAsset = clusterAsset || dtr;
+  const isTargetDTR = targetAsset?.entity_type === 'distribution_transformer';
+
+  // Extract Center Coordinates (works for DTR or any Pole/Junction)
+  const getCenterCoords = (): [number, number] | null => {
+    if (!targetAsset) return null;
+    const props = targetAsset.properties || {};
     if (props.coordinates && Array.isArray(props.coordinates) && props.coordinates.length === 2) {
       return props.coordinates as [number, number]; // [lat, lon]
     }
     if (props.latitude && props.longitude) {
       return [Number(props.latitude), Number(props.longitude)];
     }
+    if (targetAsset.entity_type === 'pole' && networkData?.poles?.features) {
+      const pFeat = networkData.poles.features.find((f: any) => f.properties.code === targetAsset.code);
+      if (pFeat?.geometry?.coordinates) {
+        return [pFeat.geometry.coordinates[1], pFeat.geometry.coordinates[0]];
+      }
+    }
+    if (isTargetDTR && networkData?.transformers?.features) {
+      const dFeat = networkData.transformers.features.find((f: any) => f.properties.code === targetAsset.code);
+      if (dFeat?.geometry?.coordinates) {
+        return [dFeat.geometry.coordinates[1], dFeat.geometry.coordinates[0]];
+      }
+    }
     return [11.270127, 75.765721];
   };
 
-  const dtrCoords = getDTRCoords();
+  const centerCoords = getCenterCoords();
 
   // Distance helper in meters
   const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -128,7 +145,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     if (!isOpen || !mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      const center = dtrCoords || [11.270127, 75.765721];
+      const center = centerCoords || [11.270127, 75.765721];
       const map = L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false,
@@ -168,14 +185,14 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       };
 
       mapInstanceRef.current = map;
-    } else if (dtrCoords) {
-      mapInstanceRef.current.setView(dtrCoords, 21.5);
+    } else if (centerCoords) {
+      mapInstanceRef.current.setView(centerCoords, 21.5);
     }
 
     setTimeout(() => {
       mapInstanceRef.current?.invalidateSize();
     }, 150);
-  }, [isOpen, dtrCoords?.[0], dtrCoords?.[1], isExpanded]);
+  }, [isOpen, centerCoords?.[0], centerCoords?.[1], isExpanded]);
 
   // Clean cleanup on component unmount
   useEffect(() => {
@@ -209,11 +226,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     tileLayerRef.current = newTileLayer;
   }, [baseMap]);
 
-  // 3. Render Cluster Features with Functional Attribute Selection & Separate DP Structure Layer
+  // 3. Render Cluster Features with Functional Attribute Selection & Coincident Pole Spiderfying
   useEffect(() => {
-    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !dtrCoords || !networkData || !dtr) return;
+    if (!isOpen || !mapInstanceRef.current || !clusterLayersRef.current || !centerCoords || !networkData || !targetAsset) return;
 
-    const [dtrLat, dtrLon] = dtrCoords;
+    const [centerLat, centerLon] = centerCoords;
     const { lines, dpStructures, poles, dtr: dtrGroup } = clusterLayersRef.current;
 
     lines.clearLayers();
@@ -221,11 +238,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     poles.clearLayers();
     dtrGroup.clearLayers();
 
-    // A. Filter Poles in immediate Triangle Cluster (within 85 meters)
+    // A. Filter Poles in immediate Cluster (within 85 meters of focal center)
     const clusterPoles = (networkData.poles?.features || []).filter((poleFeat: any) => {
       const coords = poleFeat.geometry?.coordinates;
       if (!coords) return false;
-      const dist = getDistanceMeters(dtrLat, dtrLon, coords[1], coords[0]);
+      const dist = getDistanceMeters(centerLat, centerLon, coords[1], coords[0]);
       return dist <= 85;
     });
 
@@ -233,6 +250,16 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     const stdPolesList = clusterPoles.filter((p: any) => !isDPSupport(p));
     setDpCount(dpPolesList.length);
     setStdPolesCount(stdPolesList.length);
+
+    // Group poles with identical or near-identical coordinates (< 0.8m) to spiderfy them neatly
+    const coordGroups = new Map<string, any[]>();
+    clusterPoles.forEach((p: any) => {
+      const c = p.geometry?.coordinates;
+      if (!c) return;
+      const key = `${c[1].toFixed(5)},${c[0].toFixed(5)}`;
+      if (!coordGroups.has(key)) coordGroups.set(key, []);
+      coordGroups.get(key)!.push(p);
+    });
 
     const clusterPoleCodes = new Set(clusterPoles.map((p: any) => p.properties.code));
 
@@ -245,7 +272,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       const coords = lineFeat.geometry?.coordinates;
       if (coords && coords.length > 0) {
         const mid = coords[Math.floor(coords.length / 2)];
-        return getDistanceMeters(dtrLat, dtrLon, mid[1], mid[0]) <= 85;
+        return getDistanceMeters(centerLat, centerLon, mid[1], mid[0]) <= 85;
       }
       return false;
     });
@@ -325,11 +352,33 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       dpPolesList.forEach((poleFeat: any) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
-        const pLat = coords[1];
-        const pLon = coords[0];
-        const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
+        const origLat = coords[1];
+        const origLon = coords[0];
+        const distM = getDistanceMeters(centerLat, centerLon, origLat, origLon).toFixed(1);
         const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
         const isSelected = selectedAsset?.code === poleFeat.properties.code;
+
+        // Check if multiple poles share this exact coordinate; if so, spiderfy neatly
+        const group = coordGroups.get(`${origLat.toFixed(5)},${origLon.toFixed(5)}`);
+        let pLat = origLat;
+        let pLon = origLon;
+
+        if (group && group.length > 1) {
+          const idx = group.findIndex((x) => x.properties.code === poleFeat.properties.code);
+          const angle = (2 * Math.PI * idx) / group.length;
+          const offsetM = 3.6; // 3.6m radial offset fanning
+          pLat = origLat + (offsetM * Math.sin(angle)) / 111000;
+          pLon = origLon + (offsetM * Math.cos(angle)) / (111000 * Math.cos((origLat * Math.PI) / 180));
+
+          // Draw spider connector dashed line
+          const spiderLine = L.polyline([[origLat, origLon], [pLat, pLon]], {
+            color: '#ea580c',
+            weight: 1.2,
+            dashArray: '2, 3',
+            opacity: 0.8,
+          });
+          dpStructures.addLayer(spiderLine);
+        }
 
         const dpBadgeIcon = L.divIcon({
           className: 'cluster-dp-badge-icon',
@@ -347,7 +396,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
               }; color: ${isSelected ? '#ffffff' : '#fed7aa'}; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; border: 1.5px solid ${
                 isSelected ? '#38bdf8' : '#ea580c'
               }; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">
-                ⚡ ${shortCode} (${distM}m)
+                ${shortCode} (${distM}m)
               </span>
             </div>
           `,
@@ -360,12 +409,12 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         const dpPopupHtml = `
           <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 270px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
             <div style="font-size: 10px; font-weight: 700; color: #fb923c; text-transform: uppercase; border-bottom: 1px solid #7c2d12; padding-bottom: 4px; margin-bottom: 6px;">
-              ⚡ 11 kV Double-Pole (DP) Gantry Structure
+              11 kV Double-Pole (DP) Gantry Structure
             </div>
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
             <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
               <div>Asset Code: <b style="color: #fed7aa">${poleFeat.properties.code}</b></div>
-              <div>Distance from DTR Center: <b>${distM} meters</b></div>
+              <div>Distance from Focal Center: <b>${distM} meters</b></div>
               <div>Operating Voltage: <b>11 kV Primary / 415 V Sec</b></div>
               <div>Mounts: <b>DTR + DO Fuses + AB Switchgear + LA</b></div>
               <div>Earthing: <b style="color: #34d399">IS 3043 Neutral & Body Double Pipe</b></div>
@@ -402,11 +451,33 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       stdPolesList.forEach((poleFeat: any) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
-        const pLat = coords[1];
-        const pLon = coords[0];
-        const distM = getDistanceMeters(dtrLat, dtrLon, pLat, pLon).toFixed(1);
+        const origLat = coords[1];
+        const origLon = coords[0];
+        const distM = getDistanceMeters(centerLat, centerLon, origLat, origLon).toFixed(1);
         const shortCode = getShortPoleCode(poleFeat.properties.code, poleFeat.properties.name);
         const isSelected = selectedAsset?.code === poleFeat.properties.code;
+
+        // Check if multiple poles share this exact coordinate; if so, spiderfy neatly
+        const group = coordGroups.get(`${origLat.toFixed(5)},${origLon.toFixed(5)}`);
+        let pLat = origLat;
+        let pLon = origLon;
+
+        if (group && group.length > 1) {
+          const idx = group.findIndex((x) => x.properties.code === poleFeat.properties.code);
+          const angle = (2 * Math.PI * idx) / group.length;
+          const offsetM = 3.6; // 3.6m radial offset fanning
+          pLat = origLat + (offsetM * Math.sin(angle)) / 111000;
+          pLon = origLon + (offsetM * Math.cos(angle)) / (111000 * Math.cos((origLat * Math.PI) / 180));
+
+          // Draw spider connector dashed line
+          const spiderLine = L.polyline([[origLat, origLon], [pLat, pLon]], {
+            color: '#854d0e',
+            weight: 1.2,
+            dashArray: '2, 3',
+            opacity: 0.7,
+          });
+          poles.addLayer(spiderLine);
+        }
 
         const poleBadgeIcon = L.divIcon({
           className: 'cluster-pole-badge-icon',
@@ -440,7 +511,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${poleFeat.properties.name || poleFeat.properties.code}</div>
             <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
               <div>Asset Code: <b>${poleFeat.properties.code}</b></div>
-              <div>Distance from DTR: <b>${distM} m</b></div>
+              <div>Distance from Focal Center: <b>${distM} m</b></div>
               <div>Operating Voltage: <b>${poleFeat.properties.voltage_level_kv || 0.415} kV</b></div>
               <div>Provenance: <b style="color: #38bdf8">${poleFeat.properties.provenance}</b></div>
             </div>
@@ -470,9 +541,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       });
     }
 
-    // E. Render Central DTR Beacon (respecting showDTRLayer attribute toggle)
-    if (showDTRLayer) {
-      const isDTRSelected = selectedAsset?.code === dtr.code;
+    // E. Render Central Beacon or Focal Junction Hub
+    if (isTargetDTR && showDTRLayer) {
+      const isDTRSelected = selectedAsset?.code === targetAsset.code;
       const dtrIcon = L.divIcon({
         className: 'cluster-dtr-center-icon',
         html: `
@@ -491,19 +562,19 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         iconAnchor: [24, 24],
       });
 
-      const dtrMarker = L.marker([dtrLat, dtrLon], { icon: dtrIcon });
+      const dtrMarker = L.marker([centerLat, centerLon], { icon: dtrIcon });
 
       const dtrPopupHtml = `
         <div style="font-family: ui-monospace, monospace; padding: 10px 12px; width: 260px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
           <div style="font-size: 10px; font-weight: 700; color: #ec4899; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 6px;">
             Distribution Transformer (Center)
           </div>
-          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${dtr.name || dtr.code}</div>
+          <div style="font-size: 12px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">${targetAsset.name || targetAsset.code}</div>
           <div style="font-size: 10px; color: #cbd5e1; space-y: 2px;">
-            <div>Rating: <b>${dtr.properties?.rated_kva || 100} kVA</b></div>
-            <div>Loading: <b>${dtr.properties?.loading_pct || 72}%</b></div>
+            <div>Rating: <b>${targetAsset.properties?.rated_kva || 100} kVA</b></div>
+            <div>Loading: <b>${targetAsset.properties?.loading_pct || 72}%</b></div>
             <div>Primary: 11 kV &bull; Secondary: 415 V Stepdown</div>
-            <div>Provenance: <b style="color: #38bdf8">${dtr.provenance}</b></div>
+            <div>Provenance: <b style="color: #38bdf8">${targetAsset.provenance}</b></div>
           </div>
         </div>
       `;
@@ -512,16 +583,70 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       dtrMarker.on('click', () => {
         if (onSelectAsset) {
-          onSelectAsset(dtr);
+          onSelectAsset(targetAsset);
         }
       });
 
       dtrGroup.addLayer(dtrMarker);
+    } else if (!isTargetDTR) {
+      // For Non-DTR Pole Clusters: Render Focal Hub Crosshair
+      const hubIcon = L.divIcon({
+        className: 'cluster-focal-hub-icon',
+        html: `
+          <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer;">
+            <div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.25); animation: pulse 2s infinite;"></div>
+            <div style="width: 14px; height: 14px; border-radius: 50%; background: #ea580c; border: 2.5px solid #ffffff; box-shadow: 0 0 12px #ea580c; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
+            </div>
+          </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      });
+
+      const hubMarker = L.marker([centerLat, centerLon], { icon: hubIcon });
+      hubMarker.bindTooltip(
+        `
+        <div style="background: #0f172a; color: #f8fafc; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid #ea580c;">
+          <div style="font-weight: bold; color: #fb923c;">FOCAL CLUSTER HUB</div>
+          <div>${targetAsset.name || targetAsset.code}</div>
+        </div>
+        `,
+        { direction: 'top', offset: [0, -10], opacity: 1 }
+      );
+      poles.addLayer(hubMarker);
+
+      // Also render any DTR that might be inside this 85m cluster
+      if (showDTRLayer && networkData?.transformers?.features) {
+        networkData.transformers.features.forEach((dFeat: any) => {
+          const dCoords = dFeat.geometry?.coordinates;
+          if (!dCoords) return;
+          const dLat = dCoords[1];
+          const dLon = dCoords[0];
+          if (getDistanceMeters(centerLat, centerLon, dLat, dLon) <= 85) {
+            const dIcon = L.divIcon({
+              className: 'cluster-dtr-icon-sub',
+              html: `
+                <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; cursor: pointer;">
+                  <div style="width: 18px; height: 18px; border-radius: 50%; background: #ec4899; border: 2.5px solid #ffffff; box-shadow: 0 0 12px #ec4899; display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
+                  </div>
+                </div>
+              `,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+            });
+            const dMarker = L.marker([dLat, dLon], { icon: dIcon });
+            dMarker.bindTooltip(`<b>DTR: ${dFeat.properties.name || dFeat.properties.code}</b>`, { opacity: 0.95 });
+            dtrGroup.addLayer(dMarker);
+          }
+        });
+      }
     }
   }, [
     isOpen,
-    dtrCoords?.[0],
-    dtrCoords?.[1],
+    centerCoords?.[0],
+    centerCoords?.[1],
     networkData,
     baseMap,
     showHT,
@@ -530,14 +655,16 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     showPolesLayer,
     showDTRLayer,
     selectedAsset?.code,
+    targetAsset?.code,
   ]);
 
-  if (!isOpen || !dtr) return null;
+  if (!isOpen || !targetAsset) return null;
 
-  const props = dtr.properties || {};
+  const props = targetAsset.properties || {};
   const ratedKva = props.rated_kva || 100;
   const loadingPct = props.loading_pct || 72;
   const isOverloaded = loadingPct > 100;
+  const totalClusterPoles = stdPolesCount + dpCount;
 
   return (
     <div
@@ -547,23 +674,40 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           : isDrawerOpen
           ? 'bottom-6 right-[404px] w-[530px] h-[500px] z-[1500]'
           : 'bottom-6 right-6 w-[530px] h-[500px] z-[1500]'
-      } bg-slate-900/98 border border-pink-500/50 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
+      } bg-slate-900/98 ${
+        isTargetDTR ? 'border-pink-500/50' : 'border-orange-500/50'
+      } border rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
     >
       {/* Header Bar */}
       <div className="px-4 py-3 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2.5">
-          <div className="w-7 h-7 rounded-lg bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400">
-            <Zap className="w-4 h-4" />
+          <div
+            className={`w-7 h-7 rounded-lg ${
+              isTargetDTR
+                ? 'bg-pink-500/20 border-pink-500/40 text-pink-400'
+                : 'bg-orange-500/20 border-orange-500/40 text-orange-400'
+            } border flex items-center justify-center`}
+          >
+            {isTargetDTR ? <Zap className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-white tracking-wide">{dtr.name || dtr.code}</span>
-              <span className="text-[10px] bg-pink-950/60 border border-pink-800 text-pink-300 px-1.5 py-0.2 rounded font-mono">
-                {ratedKva} kVA
+              <span className="font-bold text-white tracking-wide">{targetAsset.name || targetAsset.code}</span>
+              <span
+                className={`text-[10px] ${
+                  isTargetDTR
+                    ? 'bg-pink-950/60 border-pink-800 text-pink-300'
+                    : 'bg-orange-950/60 border-orange-800 text-orange-300'
+                } border px-1.5 py-0.2 rounded font-mono`}
+              >
+                {isTargetDTR ? `${ratedKva} kVA` : `${totalClusterPoles} Poles Clustered`}
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-mono">
-              Triangle Cluster Magnifier &bull; <span className="text-pink-300 font-bold">{currentZoom}x Zoom</span>
+              {isTargetDTR ? 'Triangle Cluster Magnifier' : 'Dense Street & Junction Magnifier'} &bull;{' '}
+              <span className={`${isTargetDTR ? 'text-pink-300' : 'text-orange-300'} font-bold`}>
+                {currentZoom}x Zoom
+              </span>
             </p>
           </div>
         </div>
@@ -575,7 +719,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <button
               onClick={() => mapInstanceRef.current?.setZoom(20)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom <= 20.2 ? 'bg-pink-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                currentZoom <= 20.2
+                  ? isTargetDTR
+                    ? 'bg-pink-600 text-white font-bold'
+                    : 'bg-orange-600 text-white font-bold'
+                  : 'text-slate-400 hover:text-white'
               }`}
               title="20x Zoom: Cluster Overview (~80m span)"
             >
@@ -584,18 +732,26 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <button
               onClick={() => mapInstanceRef.current?.setZoom(21.5)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom > 20.2 && currentZoom <= 22.2 ? 'bg-pink-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                currentZoom > 20.2 && currentZoom <= 22.2
+                  ? isTargetDTR
+                    ? 'bg-pink-600 text-white font-bold'
+                    : 'bg-orange-600 text-white font-bold'
+                  : 'text-slate-400 hover:text-white'
               }`}
-              title="21.5x Zoom: Triangle Delta (~25m span)"
+              title="21.5x Zoom: Micro-Inspection (~25m span)"
             >
               21.5x
             </button>
             <button
               onClick={() => mapInstanceRef.current?.setZoom(23)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom > 22.2 ? 'bg-pink-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                currentZoom > 22.2
+                  ? isTargetDTR
+                    ? 'bg-pink-600 text-white font-bold'
+                    : 'bg-orange-600 text-white font-bold'
+                  : 'text-slate-400 hover:text-white'
               }`}
-              title="23x Zoom: Ultra Close-Up DP Pole (~5m span)"
+              title="23x Zoom: Ultra Close-Up Single Poles & Drops (~5m span)"
             >
               23x
             </button>
@@ -616,9 +772,9 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
-            onClick={() => dtrCoords && mapInstanceRef.current?.setView(dtrCoords, 21.5)}
+            onClick={() => centerCoords && mapInstanceRef.current?.setView(centerCoords, 21.5)}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Recenter on DTR"
+            title="Recenter Focal Cluster Point"
           >
             <Navigation className="w-4 h-4" />
           </button>
@@ -639,11 +795,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         </div>
       </div>
 
-      {/* Attribute Selector Toolbar within Zoom Window (with dedicated DP Structure selector) */}
+      {/* Attribute Selector Toolbar within Zoom Window */}
       <div className="px-4 py-2 bg-slate-950/75 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono">
         <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-          <span className="text-slate-500 uppercase text-[9px] mr-1">Attribute Selectors:</span>
-          {/* DP Structure Attribute Selector Button */}
+          <span className="text-slate-500 uppercase text-[9px] mr-1">Attributes:</span>
+          {/* DP Structure Attribute Selector Button - No Emoji */}
           <button
             onClick={() => setShowDP(!showDP)}
             className={`px-2 py-0.5 rounded transition-all flex items-center space-x-1.5 ${
@@ -654,7 +810,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
             title="Toggle 11 kV DP (Double-Pole) Transformer Gantry Structure"
           >
             <span className="w-2 h-2 rounded-xs bg-orange-500 inline-block border border-orange-300" />
-            <span className="font-bold">⚡ DP Structure ({dpCount})</span>
+            <span className="font-bold">DP Structure ({dpCount})</span>
           </button>
 
           <button
@@ -703,7 +859,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
                 ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
                 : 'text-slate-500 hover:text-slate-400 bg-slate-900 border border-slate-800'
             }`}
-            title="Toggle Central DTR Station"
+            title="Toggle DTR Station"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
             <span>DTR Center</span>
@@ -722,21 +878,36 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       {/* Cluster Summary Footer Bar */}
       <div className="px-4 py-2.5 bg-slate-950/95 border-t border-slate-800 flex items-center justify-between text-xs font-mono">
         <div className="flex items-center space-x-3 text-[11px]">
-          <span className="text-slate-400">Loading:</span>
-          <span
-            className={`font-bold ${
-              isOverloaded ? 'text-rose-400' : loadingPct > 80 ? 'text-amber-400' : 'text-emerald-400'
-            }`}
-          >
-            {loadingPct}% {isOverloaded ? '(Overloaded)' : '(Optimal)'}
-          </span>
-          <span className="text-slate-600">&bull;</span>
-          <span className="text-slate-400">Mount:</span>
-          <span className="text-orange-400 font-semibold">11 kV DP Gantry (PSC 9m)</span>
+          {isTargetDTR ? (
+            <>
+              <span className="text-slate-400">Loading:</span>
+              <span
+                className={`font-bold ${
+                  isOverloaded ? 'text-rose-400' : loadingPct > 80 ? 'text-amber-400' : 'text-emerald-400'
+                }`}
+              >
+                {loadingPct}% {isOverloaded ? '(Overloaded)' : '(Optimal)'}
+              </span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Mount:</span>
+              <span className="text-orange-400 font-semibold">11 kV DP Gantry (PSC 9m)</span>
+            </>
+          ) : (
+            <>
+              <span className="text-slate-400">Cluster Density:</span>
+              <span className="text-amber-300 font-bold">{totalClusterPoles} Poles</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">DP Gantries:</span>
+              <span className="text-orange-400 font-semibold">{dpCount}</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-slate-400">Coverage:</span>
+              <span className="text-cyan-400 font-semibold">85m Radius</span>
+            </>
+          )}
         </div>
         <div className="text-[10px] text-slate-400 flex items-center space-x-1">
           <Info className="w-3 h-3 text-cyan-400" />
-          <span>Click DP structure or lines to inspect attributes</span>
+          <span>Click poles or cables to inspect attributes</span>
         </div>
       </div>
     </div>

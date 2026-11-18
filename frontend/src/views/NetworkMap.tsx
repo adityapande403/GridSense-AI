@@ -16,6 +16,53 @@ import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
 
+const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const dy = (lat2 - lat1) * 111000;
+  const dx = (lon2 - lon1) * 111000 * Math.cos((lat1 * Math.PI) / 180);
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+const getAdaptivePoleStyle = (zoom: number, isDP: boolean) => {
+  if (zoom <= 14) {
+    return {
+      radius: isDP ? 2.8 : 1.4,
+      weight: isDP ? 0.8 : 0.4,
+      fillOpacity: isDP ? 0.9 : 0.6,
+      opacity: isDP ? 0.9 : 0.6,
+    };
+  }
+  if (zoom === 15) {
+    return {
+      radius: isDP ? 3.5 : 1.8,
+      weight: isDP ? 1.0 : 0.6,
+      fillOpacity: isDP ? 0.9 : 0.7,
+      opacity: isDP ? 0.9 : 0.7,
+    };
+  }
+  if (zoom === 16) {
+    return {
+      radius: isDP ? 4.5 : 2.5,
+      weight: isDP ? 1.5 : 0.8,
+      fillOpacity: isDP ? 0.95 : 0.85,
+      opacity: isDP ? 0.95 : 0.85,
+    };
+  }
+  if (zoom === 17) {
+    return {
+      radius: isDP ? 5.5 : 3.5,
+      weight: isDP ? 2.0 : 1.2,
+      fillOpacity: 0.95,
+      opacity: 0.95,
+    };
+  }
+  return {
+    radius: isDP ? 7.0 : 4.5,
+    weight: isDP ? 2.5 : 1.5,
+    fillOpacity: 1.0,
+    opacity: 1.0,
+  };
+};
+
 interface NetworkGeoJSONResponse {
   feeders: Array<{ code: string; name: string; voltage_kv: number; trunk_conductor: string; provenance: any }>;
   substations: { type: string; features: any[] };
@@ -54,6 +101,7 @@ export const NetworkMap: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
   const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
   const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
+  const [selectedClusterAsset, setSelectedClusterAsset] = useState<SelectedAsset | null>(null);
 
   // Layer visibility toggles (matching QGIS layers)
   const [showSubstations, setShowSubstations] = useState<boolean>(true);
@@ -120,6 +168,36 @@ export const NetworkMap: React.FC = () => {
       switches: switchesGroup,
       consumers: consumersGroup,
     };
+
+    // Dynamic Zoom-Adaptive Stylist: smoothly adjusts pole and LT line weights so dense clusters never become messy blobs
+    const handleZoomEnd = () => {
+      const zoom = map.getZoom();
+      if (layerGroupsRef.current?.poles) {
+        layerGroupsRef.current.poles.eachLayer((layer: any) => {
+          if (layer.setRadius) {
+            const isDP = layer._isDP;
+            const style = getAdaptivePoleStyle(zoom, isDP);
+            layer.setRadius(style.radius);
+            layer.setStyle({
+              weight: style.weight,
+              fillOpacity: style.fillOpacity,
+              opacity: style.opacity,
+            });
+          }
+        });
+      }
+      if (layerGroupsRef.current?.ltLines) {
+        const ltWeight = zoom <= 14 ? 1.0 : zoom === 15 ? 1.4 : zoom === 16 ? 1.8 : 2.5;
+        const ltOpacity = zoom <= 15 ? 0.65 : 0.8;
+        layerGroupsRef.current.ltLines.eachLayer((layer: any) => {
+          if (layer.setStyle && !layer._isHT) {
+            layer.setStyle({ weight: ltWeight, opacity: ltOpacity });
+          }
+        });
+      }
+    };
+
+    map.on('zoomend', handleZoomEnd);
 
     mapInstanceRef.current = map;
 
@@ -205,6 +283,66 @@ export const NetworkMap: React.FC = () => {
       { padding: [40, 40], maxZoom: 17, animate: true }
     );
   }, [data?.bounds]);
+
+  // Expose global cluster zoom opener for Leaflet HTML popups
+  useEffect(() => {
+    (window as any).__openClusterZoom = (code: string) => {
+      // Check if it's a pole
+      const poleFeat = data?.poles?.features?.find((f: any) => f.properties.code === code);
+      if (poleFeat) {
+        const coords = poleFeat.geometry?.coordinates;
+        const isDP =
+          poleFeat.properties.name?.includes('DP') ||
+          poleFeat.properties.code?.includes('DP') ||
+          poleFeat.properties.name?.includes('11kV DTR');
+        const poleAsset: SelectedAsset = {
+          id: poleFeat.properties.id,
+          code: poleFeat.properties.code,
+          name: poleFeat.properties.name,
+          entity_type: 'pole',
+          provenance: poleFeat.properties.provenance,
+          confidence_score: poleFeat.properties.confidence_score,
+          properties: {
+            ...poleFeat.properties,
+            is_dp_structure: isDP,
+            coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
+          },
+        };
+        setSelectedAsset(poleAsset);
+        setSelectedClusterAsset(poleAsset);
+        setIsClusterZoomOpen(true);
+        mapInstanceRef.current?.closePopup();
+        return;
+      }
+
+      // Check if it's a DTR
+      const dtrFeat = data?.transformers?.features?.find((f: any) => f.properties.code === code);
+      if (dtrFeat) {
+        const coords = dtrFeat.geometry?.coordinates;
+        const dtrAsset: SelectedAsset = {
+          id: dtrFeat.properties.id,
+          code: dtrFeat.properties.code,
+          name: dtrFeat.properties.name,
+          entity_type: 'distribution_transformer',
+          provenance: dtrFeat.properties.provenance,
+          confidence_score: dtrFeat.properties.confidence_score,
+          properties: {
+            ...dtrFeat.properties,
+            coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
+          },
+        };
+        setSelectedAsset(dtrAsset);
+        setSelectedDTR(dtrAsset);
+        setSelectedClusterAsset(dtrAsset);
+        setIsClusterZoomOpen(true);
+        mapInstanceRef.current?.closePopup();
+      }
+    };
+
+    return () => {
+      delete (window as any).__openClusterZoom;
+    };
+  }, [data]);
 
   // 5. Render GeoJSON Assets onto Leaflet Layers
   // NOTE: selectedAsset is intentionally OMITTED from dependencies so clicking assets never wipes layers or re-triggers bounds!
@@ -378,6 +516,14 @@ export const NetworkMap: React.FC = () => {
 
     // B. Render Physical Poles & Support Structures (distinguishing DP substation structures from standard poles)
     if ((showPoles || showDPStructures) && data.poles?.features) {
+      // Precompute pole coordinates for neighborhood density analysis
+      const allPoleCoords = data.poles.features.map((f: any) => {
+        const c = f.geometry?.coordinates;
+        return { code: f.properties.code, lat: c?.[1] || 0, lon: c?.[0] || 0 };
+      });
+
+      const currentZoom = mapInstanceRef.current.getZoom();
+
       data.poles.features.forEach((poleFeat) => {
         const coords = poleFeat.geometry?.coordinates;
         if (!coords) return;
@@ -392,42 +538,75 @@ export const NetworkMap: React.FC = () => {
         if (isDP && !showDPStructures) return;
         if (!isDP && !showPoles) return;
 
+        // Calculate neighboring poles within 35 meters to detect dense street clusters
+        const neighborCount = allPoleCoords.filter(
+          (other) => other.code !== poleFeat.properties.code && getDistanceMeters(lat, lon, other.lat, other.lon) <= 35
+        ).length;
+        const isDenseCluster = neighborCount >= 4;
+
+        const poleStyle = getAdaptivePoleStyle(currentZoom, isDP);
+
         const circleMarker = L.circleMarker([lat, lon], {
-          radius: isDP ? 5.5 : 4.0,
+          radius: poleStyle.radius,
           fillColor: isDP ? '#ea580c' : '#854d0e', // Orange for DP Structure, Brown for standard pole
           color: isDP ? '#ffedd5' : '#451a03',
-          weight: isDP ? 2.5 : 1.5,
-          opacity: 0.95,
-          fillOpacity: 0.95,
+          weight: poleStyle.weight,
+          opacity: poleStyle.opacity,
+          fillOpacity: poleStyle.fillOpacity,
         });
+
+        (circleMarker as any)._isDP = isDP;
 
         circleMarker.bindTooltip(
           `
           <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid ${
-            isDP ? '#ea580c' : '#78350f'
+            isDP ? '#ea580c' : isDenseCluster ? '#f59e0b' : '#78350f'
           };">
             <div style="font-weight: bold; color: ${isDP ? '#fb923c' : '#fde047'};">${
-            isDP ? '⚡ ' + (poleFeat.properties.name || poleFeat.properties.code) : poleFeat.properties.name || poleFeat.properties.code
-          }</div>
+              poleFeat.properties.name || poleFeat.properties.code
+            }</div>
             <div>${isDP ? '11 kV DP Substation Gantry' : 'Support Structure'} &bull; ${poleFeat.properties.voltage_level_kv || 0.415} kV</div>
-            <div style="font-size: 9px; color: #94a3b8;">${isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Physical Support Structure'}</div>
+            ${
+              isDenseCluster
+                ? `<div style="color: #fb923c; font-weight: bold; margin-top: 2px;">📍 Cluster Node: ${neighborCount} poles within 35m</div>`
+                : ''
+            }
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">${
+              isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Click to inspect &bull; Double-click to Micro-Zoom'
+            }</div>
           </div>
           `,
           { direction: 'top', offset: [0, -5], opacity: 1 }
         );
 
+        const clusterBanner = isDenseCluster
+          ? `
+            <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 5px 8px; border-radius: 6px; margin-bottom: 8px; font-size: 10px; color: #fde047;">
+              <div style="font-weight: 700; color: #fb923c;">📍 Dense Street Cluster (${neighborCount} Poles in 35m)</div>
+              <div style="color: #cbd5e1; margin-top: 2px;">Junction with multiple drops and physical poles.</div>
+            </div>
+          `
+          : '';
+
+        const clusterActionBtn = `
+          <button onclick="window.__openClusterZoom('${poleFeat.properties.code}')" style="width: 100%; margin-top: 8px; padding: 7px 10px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
+            🔍 Open Micro-Zoom Cluster Window (21.5x)
+          </button>
+        `;
+
         const polePopupHtml = `
-          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 270px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+          <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 275px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
               <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${
                 isDP ? '#fb923c' : '#f59e0b'
               };">
-                ${isDP ? '⚡ 11 kV DP GANTRY STRUCTURE' : 'SUPPORT STRUCTURE'}
+                ${isDP ? '11 kV DP GANTRY STRUCTURE' : 'SUPPORT STRUCTURE'}
               </span>
               <span style="font-size: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 4px;">
                 ${poleFeat.properties.voltage_level_kv || 0.415} kV
               </span>
             </div>
+            ${clusterBanner}
             <div style="font-size: 13px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">
               ${poleFeat.properties.name || poleFeat.properties.code}
             </div>
@@ -437,28 +616,42 @@ export const NetworkMap: React.FC = () => {
               <div>Type: <b>${isDP ? 'Double-Pole (PSC 9m Gantry)' : 'Single Pole Structure'}</b></div>
               <div>Provenance: <b style="color: #38bdf8;">${poleFeat.properties.provenance}</b></div>
             </div>
+            ${clusterActionBtn}
           </div>
         `;
 
         circleMarker.bindPopup(polePopupHtml, {
-          maxWidth: 290,
+          maxWidth: 300,
           autoPan: false,
           closeButton: true,
         });
 
+        const poleAsset: SelectedAsset = {
+          id: poleFeat.properties.id,
+          code: poleFeat.properties.code,
+          name: poleFeat.properties.name,
+          entity_type: 'pole',
+          provenance: poleFeat.properties.provenance,
+          confidence_score: poleFeat.properties.confidence_score,
+          properties: {
+            ...poleFeat.properties,
+            is_dp_structure: isDP,
+            coordinates: [lat, lon],
+          },
+        };
+
         circleMarker.on('click', () => {
-          setSelectedAsset({
-            id: poleFeat.properties.id,
-            code: poleFeat.properties.code,
-            name: poleFeat.properties.name,
-            entity_type: 'pole',
-            provenance: poleFeat.properties.provenance,
-            confidence_score: poleFeat.properties.confidence_score,
-            properties: {
-              ...poleFeat.properties,
-              is_dp_structure: isDP,
-            },
-          });
+          setSelectedAsset(poleAsset);
+          if (isClusterZoomOpen) {
+            setSelectedClusterAsset(poleAsset);
+          }
+        });
+
+        circleMarker.on('dblclick', (e) => {
+          L.DomEvent.stopPropagation(e);
+          setSelectedAsset(poleAsset);
+          setSelectedClusterAsset(poleAsset);
+          setIsClusterZoomOpen(true);
         });
 
         poles.addLayer(circleMarker);
@@ -744,6 +937,7 @@ export const NetworkMap: React.FC = () => {
           };
           setSelectedAsset(dtrAsset);
           setSelectedDTR(dtrAsset);
+          setSelectedClusterAsset(dtrAsset);
           setIsClusterZoomOpen(true);
         });
 
@@ -934,7 +1128,7 @@ export const NetworkMap: React.FC = () => {
               className="rounded bg-slate-800 border-slate-700 text-orange-500 focus:ring-0"
             />
             <span className="w-2.5 h-2.5 rounded-xs bg-orange-600 inline-block border border-orange-400" />
-            <span>⚡ DP Structures (13)</span>
+            <span>DP Structures (13)</span>
           </label>
           <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
             <input
@@ -1016,10 +1210,11 @@ export const NetworkMap: React.FC = () => {
           <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#020617' }} />
         </div>
 
-        {/* DTR Local Triangle Cluster Magnifier Window */}
+        {/* Unified High-Resolution Cluster Magnifier Window (Works for DTRs and Non-DTR Clusters) */}
         <DTRClusterZoomWindow
-          isOpen={isClusterZoomOpen && selectedDTR !== null}
+          isOpen={isClusterZoomOpen && selectedClusterAsset !== null}
           onClose={() => setIsClusterZoomOpen(false)}
+          clusterAsset={selectedClusterAsset}
           dtr={selectedDTR}
           networkData={data}
           baseMap={baseMap}
