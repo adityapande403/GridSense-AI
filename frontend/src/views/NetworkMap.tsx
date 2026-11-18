@@ -8,15 +8,12 @@ import {
   Minimize2,
   RefreshCw,
   AlertTriangle,
-  Layers,
-  Map as MapIcon,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
-import { PhysicsSimulationBar, PowerFlowSummaryData } from '../components/PhysicsSimulationBar';
+import { GISLeftDock } from '../components/GISLeftDock';
+import { PowerFlowSummaryData } from '../components/PhysicsSimulationBar';
 import { ContingencyModal, ContingencyReportData } from '../components/ContingencyModal';
 
 const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
@@ -115,7 +112,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
   const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
   const [selectedClusterAsset, setSelectedClusterAsset] = useState<SelectedAsset | null>(null);
-  const [isLayersCollapsed, setIsLayersCollapsed] = useState<boolean>(false);
+  const [isDockOpen, setIsDockOpen] = useState<boolean>(true);
+  const [dockTab, setDockTab] = useState<'physics' | 'layers' | 'settings'>('physics');
 
   // Milestone 5: Physics Simulation Core (TR-PHY)
   const [powerFlowData, setPowerFlowData] = useState<PowerFlowSummaryData | null>(null);
@@ -1224,72 +1222,34 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         </div>
       )}
 
-      {/* 2. Top Floating Header HUD */}
-      <div className="absolute top-3 left-3 right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center space-x-3">
-          {/* Active Feeder Selector */}
+      {/* 2. Top Floating Quick Feeder & Telemetry Status Pill */}
+      <div
+        className={`absolute top-3 ${
+          isDockOpen ? 'left-[356px]' : 'left-36'
+        } right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex items-center justify-between gap-3 text-xs transition-all duration-300`}
+      >
+        <div className="flex items-center space-x-3 min-w-0">
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-mono font-bold text-slate-400 tracking-wider">FEEDER:</span>
-            <select
-              value={selectedFeeder}
-              onChange={(e) => setSelectedFeeder(e.target.value)}
-              className="bg-slate-950/90 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
-            >
-              <option value="all">All Network Feeders</option>
-              {data?.feeders.map((f) => (
-                <option key={f.code} value={f.code}>
-                  {f.name} ({f.code})
-                </option>
-              ))}
-            </select>
+            <span className="text-[11px] font-mono font-bold text-slate-400 tracking-wider">ACTIVE FEEDER:</span>
+            <span className="font-semibold text-white truncate">
+              {data?.feeders.find((f) => f.code === selectedFeeder)?.name || selectedFeeder} ({selectedFeeder})
+            </span>
           </div>
 
           <div className="h-4 w-px bg-slate-700/80" />
 
-          {/* Base Map Style Selector */}
-          <div className="flex items-center bg-slate-950/80 border border-slate-700/80 rounded-lg p-0.5 text-xs font-medium">
-            <button
-              onClick={() => setBaseMap('carto-voyager')}
-              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'carto-voyager' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Carto Voyager</span>
-            </button>
-            <button
-              onClick={() => setBaseMap('carto-dark')}
-              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'carto-dark' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Carto Dark</span>
-            </button>
-            <button
-              onClick={() => setBaseMap('osm')}
-              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'osm' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>OSM Streets</span>
-            </button>
-            <button
-              onClick={() => setBaseMap('satellite')}
-              className={`px-2.5 py-1 rounded-md transition-colors flex items-center space-x-1.5 ${
-                baseMap === 'satellite' ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Satellite</span>
-            </button>
+          {/* Quick Basemap Pill */}
+          <div className="hidden md:flex items-center space-x-1 font-mono text-[11px] text-slate-400 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-800">
+            <span>Map:</span>
+            <span className="text-blue-400 font-bold capitalize">
+              {baseMap.replace('carto-', '')}
+            </span>
           </div>
         </div>
 
         {/* Live Summary Chips & Top Controls */}
         {data && (
-          <div className="flex items-center space-x-2.5 text-xs font-mono">
+          <div className="flex items-center space-x-2 text-xs font-mono">
             <div className="flex items-center space-x-1 bg-slate-950/80 px-2 py-0.5 rounded-lg border border-slate-700/80">
               <span className="text-slate-400">HT:</span>
               <span className="text-rose-400 font-bold">{data.summary.total_ht_lines || 36}</span>
@@ -1341,147 +1301,64 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         )}
       </div>
 
-      {/* Floating HUD Layer: Controls & Simulation */}
-      {/* 4. Floating Physics Simulation Core HUD Bar */}
-      <PhysicsSimulationBar
-        feederCode={selectedFeeder}
+      {/* 3. Modern GIS Left Dock (Kepler.gl / ArcGIS Pro Style) */}
+      <GISLeftDock
+        isOpen={isDockOpen}
+        onToggleOpen={() => setIsDockOpen(!isDockOpen)}
+        activeTab={dockTab}
+        onTabChange={setDockTab}
+        selectedFeeder={selectedFeeder}
+        onSelectFeeder={setSelectedFeeder}
+        feeders={data?.feeders || []}
+        baseMap={baseMap}
+        onSelectBaseMap={setBaseMap}
+        onFitBounds={handleFitBounds}
+        showHTLines={showHTLines}
+        setShowHTLines={setShowHTLines}
+        showLTLines={showLTLines}
+        setShowLTLines={setShowLTLines}
+        showDTRs={showDTRs}
+        setShowDTRs={setShowDTRs}
+        showPoles={showPoles}
+        setShowPoles={setShowPoles}
+        showDPStructures={showDPStructures}
+        setShowDPStructures={setShowDPStructures}
+        showSwitches={showSwitches}
+        setShowSwitches={setShowSwitches}
+        showSubstations={showSubstations}
+        setShowSubstations={setShowSubstations}
+        showConsumers={showConsumers}
+        setShowConsumers={setShowConsumers}
+        summary={data?.summary}
         isSimulating={isSimulating}
         powerFlowData={powerFlowData}
         onRunPowerFlow={handleRunPowerFlow}
         onOpenContingencyModal={handleRunContingency}
         heatmapActive={heatmapActive}
         onToggleHeatmap={handleToggleHeatmap}
-        isLayersCollapsed={isLayersCollapsed}
       />
 
-        {/* N-1 Contingency Screening Modal */}
-        <ContingencyModal
-          isOpen={isContingencyModalOpen}
-          onClose={() => setIsContingencyModalOpen(false)}
-          report={contingencyReport}
-          onSelectContingency={(item) => {
-            const polyline = linePolylinesRef.current[item.line_code];
-            if (polyline) {
-              const bounds = polyline.getBounds();
-              mapInstanceRef.current?.fitBounds(bounds, { maxZoom: 18, animate: true });
-              polyline.fire('click');
-            }
-          }}
-        />
-
-        {/* Layer Controls Palette (Floating Top Left matching QGIS) */}
-        {isLayersCollapsed ? (
-          <button
-            onClick={() => setIsLayersCollapsed(false)}
-            className="absolute top-[56px] left-3 z-[650] bg-slate-900/95 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-2xl backdrop-blur-md flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-            title="Expand QGIS Layers"
-          >
-            <Layers className="w-3.5 h-3.5 text-blue-400" />
-            <span className="font-mono text-[11px] font-semibold">Layers</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        ) : (
-          <div className="absolute top-[56px] left-3 z-[650] bg-slate-900/95 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md space-y-2 text-xs w-[215px]">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-              <div className="flex items-center space-x-1.5">
-                <Layers className="w-3.5 h-3.5 text-blue-400" />
-                <span className="font-mono text-slate-300 font-bold uppercase tracking-wider text-[11px]">
-                  QGIS Layers
-                </span>
-              </div>
-              <button
-                onClick={() => setIsLayersCollapsed(true)}
-                className="p-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                title="Collapse Layers"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showHTLines}
-              onChange={(e) => setShowHTLines(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-rose-500 focus:ring-0"
-            />
-            <span className="w-3 h-1 bg-red-500 inline-block rounded-sm" />
-            <span>11 kV HT Backbone (36)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showLTLines}
-              onChange={(e) => setShowLTLines(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
-            />
-            <span className="w-3 h-0.5 bg-slate-400 inline-block" />
-            <span>LT Lines & Cables (517)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showDTRs}
-              onChange={(e) => setShowDTRs(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-pink-500 focus:ring-0"
-            />
-            <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block border border-white" />
-            <span>DTR Transformers (4)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showPoles}
-              onChange={(e) => setShowPoles(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-amber-600 focus:ring-0"
-            />
-            <span className="w-2 h-2 rounded-full bg-amber-700 inline-block border border-amber-950" />
-            <span>Poles ({data?.summary?.total_poles || 608})</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showDPStructures}
-              onChange={(e) => setShowDPStructures(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-orange-500 focus:ring-0"
-            />
-            <span className="w-2.5 h-2.5 rounded-xs bg-orange-600 inline-block border border-orange-400" />
-            <span>DP Structures (13)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showSwitches}
-              onChange={(e) => setShowSwitches(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-orange-500 focus:ring-0"
-            />
-            <span className="w-2.5 h-2.5 rounded-sm border border-emerald-400 inline-block" />
-            <span>Switches & Tie Points (13)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showSubstations}
-              onChange={(e) => setShowSubstations(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-purple-500 focus:ring-0"
-            />
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-            <span>33/11 kV Substation (1)</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
-            <input
-              type="checkbox"
-              checked={showConsumers}
-              onChange={(e) => setShowConsumers(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
-            />
-            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
-            <span>Consumers ({data?.consumers?.features?.length || 0})</span>
-          </label>
-        </div>
-      )}
+      {/* N-1 Contingency Screening Modal */}
+      <ContingencyModal
+        isOpen={isContingencyModalOpen}
+        onClose={() => setIsContingencyModalOpen(false)}
+        report={contingencyReport}
+        onSelectContingency={(item) => {
+          const polyline = linePolylinesRef.current[item.line_code];
+          if (polyline) {
+            const bounds = polyline.getBounds();
+            mapInstanceRef.current?.fitBounds(bounds, { maxZoom: 18, animate: true });
+            polyline.fire('click');
+          }
+        }}
+      />
 
       {/* 6. Canvas Navigation Tools (Floating Bottom Left) */}
-      <div className="absolute bottom-4 left-4 z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-md">
+      <div
+        className={`absolute bottom-4 ${
+          isDockOpen ? 'left-[356px]' : 'left-4'
+        } z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-md transition-all duration-300`}
+      >
         <button
           onClick={handleZoomIn}
           className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
