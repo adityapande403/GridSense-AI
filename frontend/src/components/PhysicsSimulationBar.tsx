@@ -101,7 +101,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
                     AC Newton-Raphson
                   </span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    TGERC &plusmn;6% (TR-PHY-03)
+                    KSERC &plusmn;6% (TR-PHY-03)
                   </span>
                 </div>
               </div>
@@ -374,7 +374,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
                   The <strong>AC Newton-Raphson solver</strong> calculates:
                 </p>
                 <ul className="list-disc list-inside text-slate-300 space-y-1 font-mono text-[11px]">
-                  <li><strong>Bus Voltages (V):</strong> Checks that voltage at every pole stays within the statutory &plusmn;6.0% band (0.94 &ndash; 1.06 p.u.) per TGERC regulations.</li>
+                  <li><strong>Bus Voltages (V):</strong> Checks that voltage at every pole stays within the statutory &plusmn;6.0% band (0.94 &ndash; 1.06 p.u.) per KSERC regulations.</li>
                   <li><strong>Conductor Currents (A):</strong> Computes the exact amperage flowing through each cable.</li>
                   <li><strong>Technical Losses (kW):</strong> Calculates energy wasted as conductor heat (I&sup2;R).</li>
                 </ul>
@@ -442,7 +442,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
                   <h4>4. Why Adjust Ambient Temperature?</h4>
                 </div>
                 <p className="text-slate-300 text-xs">
-                  In hot Indian summers (e.g. 45&deg;C in Telangana), bare overhead conductors cannot dissipate heat efficiently.
+                  In hot coastal summer conditions (e.g. 34&deg;C with high humidity in Kozhikode), bare overhead conductors cannot dissipate heat efficiently.
                   Per <strong>IEEE Standard 738</strong>, thermal capacity is derated. The temperature selector lets you simulate heatwave conditions to test if conductors will overheat during peak summer loads.
                 </p>
               </div>

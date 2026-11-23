@@ -24,7 +24,7 @@ def _generate_synthetic_historical_telemetry(
     """
     Synthesizes 30 days of hourly realistic historical SCADA and environmental data.
     Incorporates diurnal consumer mix, ambient thermal diurnal variations,
-    and the Telangana 7-hour agricultural free power supply shift (TR-FOR-04).
+    and Kerala coastal diurnal and commercial demand shifts (TR-FOR-04).
     """
     dtr_id_str = str(dtr.id)
     seed = 42
@@ -53,29 +53,29 @@ def _generate_synthetic_historical_telemetry(
         # Diurnal base shape (Domestic morning & evening peaks, Commercial midday)
         # Morning peak (07:00 - 09:00)
         morning_peak = math.exp(-((hour - 8) ** 2) / 3.0) * 0.35
-        # Evening peak (18:00 - 22:00)
-        evening_peak = math.exp(-((hour - 20) ** 2) / 4.0) * 0.45
+        # Evening peak (18:00 - 22:00) - Kerala coastal domestic lighting/cooling
+        evening_peak = math.exp(-((hour - 20) ** 2) / 4.0) * 0.50
         # Midday commercial plateau (11:00 - 16:00)
-        midday_plateau = math.exp(-((hour - 13) ** 2) / 10.0) * 0.20
+        midday_plateau = math.exp(-((hour - 13) ** 2) / 10.0) * 0.22
         # Night baseline
         night_baseline = 0.22
         
         diurnal_factor = night_baseline + morning_peak + evening_peak + midday_plateau
         
-        # Telangana 7-Hour Free Agricultural Power Pumping Shift (10:00 to 17:00)
-        # Rural & semi-urban feeders experience a 25-35% inductive surge during this window
+        # Coastal Commercial Shift / Harbour Load Block (10:00 to 17:00)
+        # Maintained as is_ag_shift column for feature pipeline & test compatibility
         is_ag_shift = 1 if (10 <= hour < 17) else 0
-        ag_boost = 0.30 if is_ag_shift else 0.0
+        ag_boost = 0.25 if is_ag_shift else 0.0
         
-        # Ambient temperature diurnal model (Telangana conditions: 26°C night to 42°C afternoon)
-        ambient_temp = 28.0 + 13.0 * math.sin((hour - 8) * math.pi / 12) if 8 <= hour <= 20 else 27.0
-        ambient_temp = max(24.0, min(44.0, ambient_temp + np.random.normal(0, 0.6)))
+        # Ambient temperature diurnal model (Kerala coastal conditions: 25°C night to 33.5°C afternoon)
+        ambient_temp = 27.5 + 5.5 * math.sin((hour - 8) * math.pi / 12) if 8 <= hour <= 20 else 25.5
+        ambient_temp = max(24.0, min(36.0, ambient_temp + np.random.normal(0, 0.4)))
         
-        # Air conditioning & thermal cooling sensitivity (+2.0% per °C above 32°C)
-        cooling_boost = max(0.0, (ambient_temp - 32.0) * 0.02)
+        # Air conditioning & thermal cooling sensitivity (+2.0% per °C above 31°C)
+        cooling_boost = max(0.0, (ambient_temp - 31.0) * 0.02)
         
         # Weekend adjustment (Commercial lower, Domestic slightly higher)
-        weekend_factor = 0.92 if is_weekend else 1.0
+        weekend_factor = 0.94 if is_weekend else 1.0
         
         # Combined active power demand
         combined_factor = (diurnal_factor + ag_boost + cooling_boost) * weekend_factor * stress_multiplier
@@ -158,7 +158,7 @@ class LightGBMTimeSeriesForecaster:
         horizons = [
             (1, "1-Hour Ahead (FLISR / Real-Time Dispatch)"),
             (4, "4-Hour Ahead (Substation Switching Window)"),
-            (8, "8-Hour Ahead (Agricultural Shift Transition)"),
+            (8, "8-Hour Ahead (Coastal Commercial Peak Transition)"),
             (24, "24-Hour Ahead (Day-Ahead Peak Management)"),
         ]
         
@@ -242,7 +242,7 @@ class LightGBMTimeSeriesForecaster:
         horizons = [
             (1, "1-Hour Ahead (FLISR / Real-Time Dispatch)"),
             (4, "4-Hour Ahead (Substation Switching Window)"),
-            (8, "8-Hour Ahead (Agricultural Shift Transition)"),
+            (8, "8-Hour Ahead (Coastal Commercial Peak Transition)"),
             (24, "24-Hour Ahead (Day-Ahead Peak Management)"),
         ]
         
@@ -294,7 +294,7 @@ class LightGBMTimeSeriesForecaster:
             target_hour = target_dt.hour
             target_dow = target_dt.weekday()
             is_ag_shift = (10 <= target_hour < 17)
-            ambient_temp = 28.0 + 13.0 * math.sin((target_hour - 8) * math.pi / 12) if 8 <= target_hour <= 20 else 27.0
+            ambient_temp = 27.5 + 5.5 * math.sin((target_hour - 8) * math.pi / 12) if 8 <= target_hour <= 20 else 25.5
             
             x_future = pd.DataFrame([{
                 "hour_sin": np.sin(2 * np.pi * target_hour / 24.0),
@@ -424,13 +424,13 @@ def generate_feeder_overload_alerts(
             severity = "CRITICAL" if projected_loading > 100.0 else "WARNING"
             
             driver = (
-                "Telangana 7h Agricultural Pumping Surge (10:00-17:00 shift) + "
-                "Afternoon Summer Thermal Cooling Peak (θ_a > 40°C)"
+                "KSEB Coastal Evening Lighting & Cooling Peak (18:00-22:00) + "
+                "Harbour Cold Storage Demand (θ_a > 32°C)"
             )
             
             mitigation = (
                 f"Execute FLISR load transfer: transfer {round(projected_peak_kw * 0.28, 1)} kW "
-                f"to adjacent donor feeder via tie-switch SW-04 (RMU-02), reducing DTR loading to {round(projected_loading * 0.72, 1)}%."
+                f"to adjacent network via tie-switch TIE_PL-660118-B-014 or SWIT_RM-2011951-001_C1 (RMU), reducing DTR loading to {round(projected_loading * 0.72, 1)}%."
             )
             
             alerts.append(

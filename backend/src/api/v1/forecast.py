@@ -26,7 +26,7 @@ def get_dtr_forecast(
     """
     Computes rolling 1h, 4h, 8h, and 24h LightGBM GBDT load forecasts with P10/P50/P90
     quantile confidence cones, walk-forward chronological benchmarking vs. Naive Persistence,
-    and feature importance analysis (Telangana agricultural shift, ambient temp, lag kW).
+    and feature importance analysis (coastal commercial shift, ambient temp, lag kW).
     """
     try:
         return build_dtr_forecast_report(db_session=db, dtr_code=dtr_code)

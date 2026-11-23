@@ -38,21 +38,34 @@ def analyze_feeder_bifurcation(
     # In Puthiya Kadavu, 553 segments total ~11.8 km
     total_length_km = max(total_route_length_km, 11.8)
 
-    # Calculate Load-Moment Centroid
-    # Default fallback near Puthiya Kadavu, Ernakulam: 10.038, 76.321
+    # Calculate Load-Moment Centroid dynamically from actual DTR GIS coordinates
+    # Kozhikode, Puthiya Kadavu Feeder (2011951)
     lat_sum = 0.0
     lon_sum = 0.0
     weight_sum = 0.0
 
     for d in dtrs:
         w = d.rated_kva or 100.0
-        # If geom exists
-        lat_sum += 10.0385 * w
-        lon_sum += 76.3215 * w
-        weight_sum += w
+        lat = None
+        lon = None
+        if d.geom:
+            geom_str = str(d.geom)
+            if "POINT" in geom_str:
+                try:
+                    coords_str = geom_str.replace("POINT (", "").replace("POINT(", "").replace(")", "")
+                    parts = coords_str.strip().split()
+                    if len(parts) >= 2:
+                        lon = float(parts[0])
+                        lat = float(parts[1])
+                except Exception:
+                    pass
+        if lat is not None and lon is not None:
+            lat_sum += lat * w
+            lon_sum += lon * w
+            weight_sum += w
 
-    centroid_lat = lat_sum / max(1.0, weight_sum) if weight_sum > 0 else 10.0385
-    centroid_lon = lon_sum / max(1.0, weight_sum) if weight_sum > 0 else 76.3215
+    centroid_lat = (lat_sum / weight_sum) if weight_sum > 0 else 11.270065
+    centroid_lon = (lon_sum / weight_sum) if weight_sum > 0 else 75.765743
 
     # Check Triggers (TR-CPX-01)
     current_loading_pct = 78.5  # near threshold
@@ -69,40 +82,43 @@ def analyze_feeder_bifurcation(
     is_triggered = len(triggers) > 0
     discount_rate = discount_rate_pct / 100.0
 
-    # Formulate 3 distinct candidate split locations along the main trunk
+    # Formulate 3 distinct candidate split locations along the Puthiya Kadavu trunk
     split_definitions = [
         {
             "id": "SPLIT-01",
-            "node_code": "PL-660118-B-001",
-            "location": "Near DTR-18 Tap Point (Load Centroid Split)",
-            "express_km": 1.45,
-            "ratio": "52% / 48%",
-            "a_kw": 285.0,
-            "b_kw": 260.0,
+            "node_code": "PL-2011951-007",
+            "location": "Beach 2 Tap Point (Load Centroid Split)",
+            "coordinates": {"latitude": 11.270124, "longitude": 75.765715},
+            "express_km": 1.25,
+            "ratio": "55% / 45%",
+            "a_kw": 310.0,
+            "b_kw": 250.0,
             "a_v": 0.988,
             "b_v": 0.992,
             "loss_reduction_kw": 4.85,
         },
         {
             "id": "SPLIT-02",
-            "node_code": "PL-660119-A-001",
-            "location": "Substation Midpoint Sectionalizer SW-02",
-            "express_km": 1.10,
-            "ratio": "64% / 36%",
+            "node_code": "SWIT_RM-2011951-001_C1",
+            "location": "Midpoint Motorized RMU Junction",
+            "coordinates": {"latitude": 11.268532, "longitude": 75.766209},
+            "express_km": 0.95,
+            "ratio": "62% / 38%",
             "a_kw": 350.0,
-            "b_kw": 195.0,
+            "b_kw": 210.0,
             "a_v": 0.979,
             "b_v": 0.994,
             "loss_reduction_kw": 3.90,
         },
         {
             "id": "SPLIT-03",
-            "node_code": "PL-660115-B-015",
-            "location": "Industrial Pocket RMU Tie Terminal",
-            "express_km": 1.85,
-            "ratio": "41% / 59%",
-            "a_kw": 225.0,
-            "b_kw": 320.0,
+            "node_code": "PL-2011951-025",
+            "location": "Harbour Cold Storage Tap Point",
+            "coordinates": {"latitude": 11.266903, "longitude": 75.766733},
+            "express_km": 1.65,
+            "ratio": "42% / 58%",
+            "a_kw": 235.0,
+            "b_kw": 325.0,
             "a_v": 0.991,
             "b_v": 0.982,
             "loss_reduction_kw": 4.30,
@@ -133,6 +149,7 @@ def analyze_feeder_bifurcation(
                 rank=idx + 1,
                 split_node_code=s["node_code"],
                 split_node_location=s["location"],
+                coordinates=s["coordinates"],
                 express_line_length_km=s["express_km"],
                 load_ratio_split=s["ratio"],
                 feeder_a_peak_kw=s["a_kw"],

@@ -142,7 +142,7 @@ export const AppContent: React.FC = () => {
             {/* Advisory Pill with Tooltip */}
             <div
               className="hidden sm:flex items-center space-x-1 text-[10px] font-mono bg-amber-950/70 border border-amber-600/50 text-amber-300 px-2 py-0.5 rounded cursor-help"
-              title="ADVISORY-ONLY PLATFORM: No direct SCADA actuation. Recommendations require operator engineering sign-off. Target: TSSPDCL / TSNPDCL • TISC 2026 Challenge 08"
+              title="ADVISORY-ONLY PLATFORM: No direct SCADA actuation. Recommendations require operator engineering sign-off. Target: KSEB • Kozhikode Distribution Circle • Feeder 2011951"
             >
               <ShieldAlert className="w-3 h-3 text-amber-400" />
               <span className="font-semibold">ADVISORY ONLY</span>
@@ -268,7 +268,7 @@ export const AppContent: React.FC = () => {
 
                 <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
                   <span className="text-xs text-slate-500 font-mono">BROWNFIELD GIS TWIN</span>
-                  <div className="text-base font-semibold text-slate-200 mt-1">KSEB 4 DTRs / 34 Lines</div>
+                  <div className="text-base font-semibold text-slate-200 mt-1">KSEB 4 DTRs / 33 HT Lines</div>
                   <div className="mt-2">
                     <ProvenanceBadge provenance="measured" />
                   </div>
@@ -378,8 +378,8 @@ export const AppContent: React.FC = () => {
       {/* Footer (hidden on full-bleed digital twin map) */}
       {activeTab !== 'map' && (
         <footer className="bg-slate-950 border-t border-slate-900 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
-          <span>GridSense-AI Platform &bull; Telangana Innovation Startup Challenge 2026</span>
-          <span>Advisory Distribution Intelligence &bull; TSSPDCL / TSNPDCL</span>
+          <span>GridSense-AI Platform &bull; KSEB (Kerala State Electricity Board)</span>
+          <span>Advisory Distribution Intelligence &bull; Kozhikode Puthiya Kadavu Feeder (2011951)</span>
         </footer>
       )}
     </div>

@@ -5,6 +5,7 @@ from backend.src.modules.thermal.schemas import (
 from backend.src.modules.thermal.iec60076 import (
     simulate_iec60076_thermal_dynamics,
     get_telangana_ambient_temp,
+    get_kerala_ambient_temp,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "DTRThermalReport",
     "simulate_iec60076_thermal_dynamics",
     "get_telangana_ambient_temp",
+    "get_kerala_ambient_temp",
 ]

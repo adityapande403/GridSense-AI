@@ -29,7 +29,7 @@ class ForecastDataPoint(BaseModel):
     
     # Environmental & Operational Context Features (TR-FOR-04)
     ambient_temp_c: float = Field(..., description="Forecasted ambient temperature in °C")
-    is_ag_shift_active: bool = Field(False, description="Telangana 7-hour agricultural free power shift flag")
+    is_ag_shift_active: bool = Field(False, description="Coastal commercial / pumping shift flag")
     
     model_name: str = "LightGBM_GBDT_Quantile_v1"
     provenance: str = Field("predicted", description="Must be labeled 'predicted' per Principle A4-7")
@@ -95,11 +95,11 @@ class OverloadEarlyWarningAlert(BaseModel):
     severity: str = Field(..., description="'WARNING' (85-100%) or 'CRITICAL' (>100%)")
     primary_driver: str = Field(
         ...,
-        description="e.g. 'Telangana Agricultural Shift Pumping Surge + Diurnal Thermal Peak'"
+        description="e.g. 'KSEB Coastal Evening Lighting Peak + Harbour Demand'"
     )
     recommended_mitigation: str = Field(
         ...,
-        description="e.g. 'Initiate FLISR tie-switch reconfiguration to transfer 45 kW to Feeder B via SW-04'"
+        description="e.g. 'Initiate FLISR tie-switch reconfiguration to transfer 45 kW via tie-switch TIE_PL-660118-B-014'"
     )
     is_acknowledged: bool = False
     provenance: str = "predicted"

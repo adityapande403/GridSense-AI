@@ -49,18 +49,31 @@ def evaluate_dtr_investments(
 
     for dtr in dtrs:
         rated_kva = dtr.rated_kva or 100.0
+        # Parse coordinates from dtr.geom
+        coords = None
+        if dtr.geom:
+            geom_str = str(dtr.geom)
+            if "POINT" in geom_str:
+                try:
+                    coords_str = geom_str.replace("POINT (", "").replace("POINT(", "").replace(")", "")
+                    parts = coords_str.strip().split()
+                    if len(parts) >= 2:
+                        coords = {"latitude": float(parts[1]), "longitude": float(parts[0])}
+                except Exception:
+                    coords = None
+
         # Estimate consumer count and peak load
         consumer_count = int(rated_kva * 4.2)
         # Simulate loading based on rating
-        # For DTR-15 or DTR-19 simulate peak stress
-        if "15" in (dtr.code or "") or "19" in (dtr.code or ""):
+        # DT-2011951-001 (Beach 2) or legacy DTR-15/DTR-19 simulate peak stress
+        if any(k in (dtr.code or "") for k in ["001", "15", "19"]):
             peak_kva = rated_kva * 1.08  # 108% peak loading
             loading_pct = 108.0
             tail_v = 0.925
             health_idx = 48.0
             urgency = "HIGH"
             overloaded_count += 1
-        elif "18" in (dtr.code or ""):
+        elif any(k in (dtr.code or "") for k in ["003", "18"]):
             peak_kva = rated_kva * 0.88  # 88% elevated loading
             loading_pct = 88.0
             tail_v = 0.948
@@ -184,6 +197,8 @@ def evaluate_dtr_investments(
             DTRInvestmentCandidate(
                 dtr_id=str(dtr.id),
                 dtr_code=dtr.code,
+                dtr_name=dtr.name,
+                coordinates=coords,
                 rated_kva=rated_kva,
                 peak_load_kva=round(peak_kva, 1),
                 current_loading_pct=round(loading_pct, 1),

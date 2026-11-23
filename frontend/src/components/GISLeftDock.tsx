@@ -307,7 +307,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                       {powerFlowData.min_voltage_pu.toFixed(4)} p.u.
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
-                      TGERC &plusmn;6%
+                      KSERC &plusmn;6%
                     </div>
                   </div>
                 </div>

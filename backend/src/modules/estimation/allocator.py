@@ -70,14 +70,14 @@ def allocate_dtr_load_profile(
             total_sanctioned += kw
         consumer_count = len(consumers)
     else:
-        # Brownfield synthesis based on kVA rating
+        # Brownfield synthesis based on kVA rating (Kerala coastal semi-urban profile)
         consumer_count = int(rated_kva * 4.2)
         total_sanctioned = rated_kva * 1.35
-        # Mixed semi-urban profile
-        cat_sanctioned["domestic"] = total_sanctioned * 0.58
-        cat_sanctioned["commercial"] = total_sanctioned * 0.18
-        cat_sanctioned["agricultural"] = total_sanctioned * 0.16
-        cat_sanctioned["industrial"] = total_sanctioned * 0.08
+        # KSEB Coastal mix: Domestic 62%, Commercial (Harbour/markets) 24%, Industrial 10%, Ag 4%
+        cat_sanctioned["domestic"] = total_sanctioned * 0.62
+        cat_sanctioned["commercial"] = total_sanctioned * 0.24
+        cat_sanctioned["industrial"] = total_sanctioned * 0.10
+        cat_sanctioned["agricultural"] = total_sanctioned * 0.04
 
     # Category mix percentages
     category_mix_pct = {

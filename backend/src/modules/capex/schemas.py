@@ -73,6 +73,8 @@ class DTRInvestmentCandidate(BaseModel):
     """Comprehensive 3-way evaluation for a single overloaded or high-risk DTR."""
     dtr_id: str
     dtr_code: str
+    dtr_name: Optional[str] = None
+    coordinates: Optional[Dict[str, float]] = None
     rated_kva: float
     peak_load_kva: float
     current_loading_pct: float
@@ -107,6 +109,7 @@ class BifurcationSplitCandidate(BaseModel):
     rank: int
     split_node_code: str
     split_node_location: str
+    coordinates: Optional[Dict[str, float]] = None
     express_line_length_km: float
     load_ratio_split: str = Field(..., description="e.g. '52% / 48%'")
     

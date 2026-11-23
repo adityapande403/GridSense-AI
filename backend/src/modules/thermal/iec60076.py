@@ -20,15 +20,18 @@ OIL_EXPONENT_X = 0.8      # Oil exponent for ONAN cooling
 WINDING_EXPONENT_Y = 1.6  # Winding exponent
 
 
-def get_telangana_ambient_temp(hour: int, base_ambient_c: float = 35.0) -> float:
+def get_kerala_ambient_temp(hour: int, base_ambient_c: float = 30.0) -> float:
     """
-    Simulates diurnal ambient temperature curve typical of Telangana distribution networks.
-    Trough at 05:00 (approx base - 5°C), peak at 14:00 (approx base + 6°C).
+    Simulates diurnal ambient temperature curve typical of Kerala coastal distribution networks (25°C - 34°C).
+    Trough at 05:00 (approx base - 4.5°C), peak at 14:00 (approx base + 4.0°C).
     """
-    # Peak at 14:00, trough at 02:00-05:00
     angle = (hour - 9) * (2.0 * math.pi / 24.0)
-    swing = 5.5
+    swing = 4.2
     return round(base_ambient_c + swing * math.sin(angle), 1)
+
+
+# Maintain alias for backward compatibility and test passing
+get_telangana_ambient_temp = get_kerala_ambient_temp
 
 
 def simulate_iec60076_thermal_dynamics(

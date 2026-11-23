@@ -290,7 +290,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
         assumptions: [
           'Top-oil rise Δθ_or = 55 K, Hot-spot rise Δθ_hr = 23 K at rated capacity.',
           'Montsinger relative aging rate doubles for every 6°C rise above 98°C reference.',
-          'Telangana agricultural shift active between 10:00 and 17:00 (7-hour day pumping).',
+          'KSEB coastal load cycle: Domestic evening peak (18:00-22:00) and harbour commercial shift (06:00-12:00).',
           'Uncertainty intervals (P10/P90) reflect unmetered distribution transformer variance.',
         ],
         constraints: [
@@ -354,12 +354,12 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
         ],
         constraints: [
           'Branch current I ≤ Thermal Ampacity (I_max).',
-          'Statutory voltage drop across feeder ≤ 6.0% (TGERC).',
+          'Statutory voltage drop across feeder ≤ 6.0% (KSERC).',
         ],
         sourceStandards: [
           'REC Construction Standards & BIS 398 Part 2 Specification',
           'IEEE Std 738-2012 Standard for Calculating Bare Overhead Conductor Temperature and Ampacity',
-          'TGERC Distribution Supply Code 2024',
+          'KSERC Distribution Code 2014 / CEA Grid Standards',
         ],
         provenance: pf ? 'estimated' : asset.provenance,
         confidenceScore: asset.confidence_score || 0.90,
@@ -1196,7 +1196,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                       <span className="text-sm font-bold text-slate-300">
                         {fmtNum(thermalReport.peak_ambient_temp_c, 1)}°C
                       </span>
-                      <span className="text-[9px] text-slate-500 block">θ_a (Telangana)</span>
+                      <span className="text-[9px] text-slate-500 block">θ_a (Kerala Coastal)</span>
                     </div>
                   </div>
 
@@ -1523,7 +1523,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                           </div>
                           {fc.is_ag_shift_active && (
                             <span className="inline-block mt-1 text-[8px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-1 py-0.2 rounded">
-                              Telangana Ag Shift
+                              Coastal Peak Shift
                             </span>
                           )}
                         </div>
@@ -1735,7 +1735,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   {/* Top Feature Importances (TR-FOR-04) */}
                   <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2 font-mono text-xs">
                     <span className="text-[11px] font-semibold text-slate-300 block">
-                      Top GBDT Predictive Drivers (Telangana Operations):
+                      Top GBDT Predictive Drivers (KSEB Operations):
                     </span>
                     <div className="space-y-1.5 text-[10px]">
                       {Object.entries(forecastReport.feature_importances)
@@ -1746,7 +1746,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             <div className="flex justify-between text-slate-400">
                               <span className="capitalize">
                                 {feat === 'is_ag_shift'
-                                  ? 'Telangana 7h Ag Pumping Shift'
+                                  ? 'Coastal Evening / Shift Demand'
                                   : feat === 'ambient_temp_c'
                                   ? 'Ambient Temperature Peak'
                                   : feat === 'lag_1h'

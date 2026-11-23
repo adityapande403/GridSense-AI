@@ -191,7 +191,7 @@ export const SwitchingWorkbench: React.FC = () => {
   const [justification, setJustification] = useState<string>(
     'AC Newton-Raphson feasibility confirmed. Minimal loss reconfiguration with break-before-make interlock verified.'
   );
-  const [fieldCrew, setFieldCrew] = useState<string>('Aluva North Line Crew #1');
+  const [fieldCrew, setFieldCrew] = useState<string>('Kozhikode Puthiya Kadavu Field Crew #1');
   const [isSubmittingApproval, setIsSubmittingApproval] = useState<boolean>(false);
   const [approvalResult, setApprovalResult] = useState<SwitchingApprovalResponse | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);

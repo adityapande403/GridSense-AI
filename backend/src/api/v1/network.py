@@ -368,15 +368,17 @@ def get_network_geojson(
             all_lons.append(dtr_coords[0])
             all_lats.append(dtr_coords[1])
 
-        # Calculate or assign loading
+        # Calculate or assign loading based on feeder assets
         loading_pct = 72.0
-        if "DTR_01" in dtr.code or "DTR_03" in dtr.code:
-            loading_pct = 114.2  # Critical overloaded DTR for demo scenario!
+        if "001" in dtr.code or "DTR_01" in dtr.code or "DTR_03" in dtr.code:
+            loading_pct = 108.5  # Overloaded DTR (Beach 2)
             overloaded_count += 1
-        elif "DTR_02" in dtr.code or "DTR_04" in dtr.code:
-            loading_pct = 68.4
-        elif dtr.rated_kva == 500.0:
-            loading_pct = 82.5
+        elif "003" in dtr.code:
+            loading_pct = 88.0   # Elevated Harbour DTR
+        elif "002" in dtr.code or dtr.rated_kva == 500.0:
+            loading_pct = 82.5   # Beach 3 (500 kVA)
+        elif "004" in dtr.code or "DTR_02" in dtr.code or "DTR_04" in dtr.code:
+            loading_pct = 68.4   # Beach 1 (250 kVA)
 
         dtr_features.append(
             {
@@ -545,15 +547,20 @@ def get_network_sld(
         if feeder_ids
         else db.query(Bus).all()
     )
+    bus_map = {b.id: b for b in buses}
     lines = (
         db.query(Line).filter(Line.feeder_id.in_(feeder_ids)).all()
         if feeder_ids
         else db.query(Line).all()
     )
-    dtrs = db.query(DistributionTransformer).all()
+    dtrs = (
+        db.query(DistributionTransformer)
+        .filter(DistributionTransformer.bus_id.in_(bus_map.keys()))
+        .all()
+        if bus_map
+        else db.query(DistributionTransformer).all()
+    )
     switches = db.query(Switch).all()
-
-    bus_map = {b.id: b for b in buses}
 
     tree_nodes = []
     # Substation root
@@ -597,7 +604,7 @@ def get_network_sld(
                 "parent_bus": parent_b.code if parent_b else None,
                 "rated_kva": dtr.rated_kva,
                 "phase_count": dtr.phase_count,
-                "loading_pct": 114.2 if "01" in dtr.code else 68.0,
+                "loading_pct": 108.5 if "001" in dtr.code or "01" in dtr.code else (88.0 if "003" in dtr.code else (82.5 if "002" in dtr.code else 68.4)),
                 "provenance": dtr.provenance,
             }
         )

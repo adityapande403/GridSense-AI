@@ -74,6 +74,8 @@ interface DTROptionEvaluation {
 interface DTRInvestmentCandidate {
   dtr_id: string;
   dtr_code: string;
+  dtr_name?: string;
+  coordinates?: { latitude: number; longitude: number };
   rated_kva: number;
   peak_load_kva: number;
   current_loading_pct: number;
@@ -100,6 +102,7 @@ interface BifurcationSplitCandidate {
   rank: number;
   split_node_code: string;
   split_node_location: string;
+  coordinates?: { latitude: number; longitude: number };
   express_line_length_km: number;
   load_ratio_split: string;
   feeder_a_peak_kw: number;
@@ -371,7 +374,7 @@ export const CapexPlanner: React.FC = () => {
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">FINANCIAL METRIC</span>
             <span className="font-bold text-purple-400">NPV + Simple Payback</span>
-            <span className="text-slate-400 block text-[10px]">TGERC Regulated</span>
+            <span className="text-slate-400 block text-[10px]">KSERC Regulated</span>
           </div>
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg flex items-center justify-center">
@@ -551,7 +554,7 @@ export const CapexPlanner: React.FC = () => {
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                   }`}
                 >
-                  <span className="font-bold">{cand.dtr_code}</span>
+                  <span className="font-bold">{cand.dtr_name ? `${cand.dtr_name} (${cand.dtr_code})` : cand.dtr_code}</span>
                   <span className="text-[10px] text-slate-400">({cand.rated_kva} kVA)</span>
                   <span
                     className={`text-[9px] px-1 py-0.2 rounded font-bold ${
@@ -795,8 +798,16 @@ export const CapexPlanner: React.FC = () => {
                         <StatusBadge status={split.status} />
                       </div>
 
-                      <div className="text-xs text-slate-300 font-mono mt-2">
-                        Location: <strong className="text-white">{split.split_node_location}</strong>
+                      <div className="text-xs text-slate-300 font-mono mt-2 space-y-0.5">
+                        <div>
+                          Node: <strong className="text-cyan-300">{split.split_node_code}</strong> &bull;{' '}
+                          <strong className="text-white">{split.split_node_location}</strong>
+                        </div>
+                        {split.coordinates && (
+                          <div className="text-[10px] text-slate-400">
+                            GPS: {split.coordinates.latitude.toFixed(6)}°N, {split.coordinates.longitude.toFixed(6)}°E
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs font-mono">

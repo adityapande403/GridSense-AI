@@ -66,12 +66,18 @@ def list_network_switches(
 
     feeder_bus_ids = [b.id for b in db.query(Bus.id).filter(Bus.feeder_id == feeder.id).all()]
     switches = (
-        db_session := db.query(Switch)
+        db.query(Switch)
         .filter((Switch.from_bus_id.in_(feeder_bus_ids)) | (Switch.to_bus_id.in_(feeder_bus_ids)))
         .all()
     )
 
-    bus_map = {str(b.id): b.code for b in db.query(Bus).filter(Bus.feeder_id == feeder.id).all()}
+    all_connected_bus_ids = set()
+    for s in switches:
+        if s.from_bus_id:
+            all_connected_bus_ids.add(s.from_bus_id)
+        if s.to_bus_id:
+            all_connected_bus_ids.add(s.to_bus_id)
+    bus_map = {str(b.id): b.code for b in db.query(Bus).filter(Bus.id.in_(all_connected_bus_ids)).all()}
 
     result = []
     for s in switches:
