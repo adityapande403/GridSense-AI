@@ -1092,40 +1092,8 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
           </div>
         </div>
 
-        {/* Quick Zoom Presets & Action Controls */}
+        {/* Action Controls */}
         <div className="flex items-center space-x-1 shrink-0">
-          <div className="flex items-center space-x-0.5 bg-slate-900 px-1 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono mr-0.5">
-            <button
-              onClick={() => mapInstanceRef.current?.setZoom(20)}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom <= 20.2 ? `${entityColors.btnActive} text-white font-bold` : 'text-slate-400 hover:text-white'
-              }`}
-              title="20x Zoom: Cluster Overview (~80m span)"
-            >
-              20x
-            </button>
-            <button
-              onClick={() => mapInstanceRef.current?.setZoom(21.5)}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom > 20.2 && currentZoom <= 22.2
-                  ? `${entityColors.btnActive} text-white font-bold`
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="21.5x Zoom: Micro-Inspection (~25m span)"
-            >
-              21.5x
-            </button>
-            <button
-              onClick={() => mapInstanceRef.current?.setZoom(23)}
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                currentZoom > 22.2 ? `${entityColors.btnActive} text-white font-bold` : 'text-slate-400 hover:text-white'
-              }`}
-              title="23x Zoom: Ultra Close-Up Details (~5m span)"
-            >
-              23x
-            </button>
-          </div>
-
           <button
             onClick={() => mapInstanceRef.current?.zoomIn()}
             className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
