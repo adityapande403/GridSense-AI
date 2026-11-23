@@ -180,6 +180,7 @@ def get_network_geojson(
         )
 
     # Resolve feeder filter
+    all_feeders = db.query(Feeder).all()
     feeder_query = db.query(Feeder)
     if feeder_code and feeder_code.lower() != "all":
         feeder_query = feeder_query.filter(Feeder.code == feeder_code)
@@ -489,7 +490,7 @@ def get_network_geojson(
                 "trunk_conductor": f.trunk_conductor_type,
                 "provenance": f.provenance,
             }
-            for f in feeders
+            for f in all_feeders
         ],
         "substations": {"type": "FeatureCollection", "features": substation_features},
         "lines": {"type": "FeatureCollection", "features": line_features},

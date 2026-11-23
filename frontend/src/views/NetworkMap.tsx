@@ -386,21 +386,32 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
     };
   }, [isFullscreen]);
 
-  // Invalidate map size when tab becomes active again
+  // Invalidate map size and ensure bounds are properly fitted when tab becomes active again
   useEffect(() => {
     if (isActive && mapInstanceRef.current) {
       const t1 = setTimeout(() => {
         mapInstanceRef.current?.invalidateSize();
       }, 50);
       const t2 = setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-      }, 250);
+        if (!mapInstanceRef.current) return;
+        mapInstanceRef.current.invalidateSize();
+        if (data?.bounds && data.bounds.length === 2) {
+          const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+          mapInstanceRef.current.fitBounds(
+            [
+              [minLat, minLon],
+              [maxLat, maxLon],
+            ],
+            { padding: [40, 40], maxZoom: 17, animate: false }
+          );
+        }
+      }, 200);
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
       };
     }
-  }, [isActive]);
+  }, [isActive, data?.bounds]);
 
   // 2. Handle Base Map Tile Layer Switch
   useEffect(() => {
@@ -501,6 +512,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   };
 
   useEffect(() => {
+    setSelectedAsset(null);
+    setSelectedClusterAsset(null);
+    setIsClusterZoomOpen(false);
     fetchNetworkData(selectedFeeder);
     // Fetch Milestone 7 Predictive Overload Early Warning Alerts
     fetch(`/api/v1/forecast/feeder-alerts?feeder_code=${selectedFeeder}`)
@@ -762,7 +776,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
           setSelectedAsset(lineAsset);
           setSelectedClusterAsset(lineAsset);
-          setIsClusterZoomOpen(true);
         });
 
         if (isHT) {
@@ -900,7 +913,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           mapInstanceRef.current?.closePopup();
           setSelectedAsset(poleAsset);
           setSelectedClusterAsset(poleAsset);
-          setIsClusterZoomOpen(true);
         });
 
         circleMarker.on('dblclick', (e) => {
@@ -998,7 +1010,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           };
           setSelectedAsset(subAsset);
           setSelectedClusterAsset(subAsset);
-          setIsClusterZoomOpen(true);
         });
 
         substations.addLayer(marker);
@@ -1104,7 +1115,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           };
           setSelectedAsset(swAsset);
           setSelectedClusterAsset(swAsset);
-          setIsClusterZoomOpen(true);
         });
 
         switches.addLayer(marker);
@@ -1209,7 +1219,6 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           setSelectedAsset(dtrAsset);
           setSelectedDTR(dtrAsset);
           setSelectedClusterAsset(dtrAsset);
-          setIsClusterZoomOpen(true);
         });
 
         dtrs.addLayer(marker);
@@ -1499,6 +1508,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       <AssetInspectionDrawer
         asset={selectedAsset}
         onClose={handleCloseDrawer}
+        onOpenClusterZoom={() => setIsClusterZoomOpen(true)}
       />
     </div>
   );

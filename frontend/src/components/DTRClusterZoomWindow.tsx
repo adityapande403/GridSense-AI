@@ -1044,7 +1044,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         isExpanded
           ? 'inset-6 z-[2500]'
           : isDrawerOpen
-          ? 'bottom-4 right-[396px] w-[530px] h-[430px] z-[1500]'
+          ? 'bottom-4 right-[580px] w-[530px] h-[430px] z-[1500]'
           : 'bottom-4 right-4 w-[530px] h-[430px] z-[1500]'
       } bg-slate-900/98 border ${
         entityColors.border
