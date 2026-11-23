@@ -15,7 +15,6 @@ import {
   AlertTriangle,
   Info,
   Sparkles,
-  Search,
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
@@ -152,13 +151,11 @@ interface DTRForecastReport {
 export interface AssetInspectionDrawerProps {
   asset: SelectedAsset | null;
   onClose: () => void;
-  onOpenClusterZoom?: () => void;
 }
 
 export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
   asset,
   onClose,
-  onOpenClusterZoom,
 }) => {
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
   const [dtrTab, setDtrTab] = useState<'overview' | 'estimation' | 'thermal' | 'forecast'>(() => {
@@ -585,16 +582,6 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           </div>
 
           <div className="flex items-center space-x-1.5">
-            {onOpenClusterZoom && (
-              <button
-                onClick={onOpenClusterZoom}
-                title="Open 22x High-Resolution Cluster Magnifier"
-                className="px-2 py-1 rounded-lg text-amber-300 hover:text-white bg-amber-950/60 hover:bg-amber-900/80 border border-amber-600/50 transition-colors flex items-center space-x-1 text-[11px] font-mono font-bold"
-              >
-                <Search className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Magnifier</span>
-              </button>
-            )}
             {isDtr && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
