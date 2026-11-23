@@ -97,11 +97,13 @@ type BaseMapType = 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
 export interface NetworkMapProps {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  isActive?: boolean;
 }
 
 export const NetworkMap: React.FC<NetworkMapProps> = ({
   isFullscreen = false,
   onToggleFullscreen,
+  isActive = true,
 }) => {
   const [data, setData] = useState<NetworkGeoJSONResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -381,6 +383,22 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       clearTimeout(t2);
     };
   }, [isFullscreen]);
+
+  // Invalidate map size when tab becomes active again
+  useEffect(() => {
+    if (isActive && mapInstanceRef.current) {
+      const t1 = setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 50);
+      const t2 = setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 250);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [isActive]);
 
   // 2. Handle Base Map Tile Layer Switch
   useEffect(() => {

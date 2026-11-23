@@ -33,14 +33,16 @@ export const App: React.FC = () => {
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
   useEffect(() => {
-    window.location.hash = activeTab;
+    if (window.location.hash !== `#${activeTab}`) {
+      window.history.replaceState(null, '', `#${activeTab}`);
+    }
   }, [activeTab]);
 
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
       if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(hash)) {
-        setActiveTab(hash as any);
+        setActiveTab((prev) => (prev !== hash ? (hash as any) : prev));
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -143,24 +145,32 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Workspace Body */}
-      <main
-        className={`flex-1 min-h-0 ${
-          activeTab === 'map'
-            ? isMapFullscreen
-              ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
-              : 'relative w-full h-full p-0 m-0 overflow-hidden bg-slate-950'
-            : 'p-6 space-y-6 overflow-y-auto'
-        }`}
-      >
-        {activeTab === 'map' && (
+      <main className="flex-1 min-h-0 relative w-full h-full overflow-hidden">
+        {/* Network Map Tab (Preserved in DOM to prevent map reloads & re-fetches) */}
+        <div
+          className={`w-full h-full ${
+            activeTab === 'map'
+              ? isMapFullscreen
+                ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
+                : 'relative w-full h-full p-0 m-0 overflow-hidden bg-slate-950'
+              : 'hidden'
+          }`}
+        >
           <NetworkMap
             isFullscreen={isMapFullscreen}
             onToggleFullscreen={() => setIsMapFullscreen(!isMapFullscreen)}
+            isActive={activeTab === 'map'}
           />
-        )}
+        </div>
 
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
+        {/* Scrollable Container for Standard Workspace Tabs */}
+        <div
+          className={`w-full h-full p-6 space-y-6 overflow-y-auto ${
+            activeTab === 'map' ? 'hidden' : 'block'
+          }`}
+        >
+          {/* Executive Overview */}
+          <div className={activeTab === 'overview' ? 'block space-y-6' : 'hidden'}>
             {/* Tier 1 Delivery Status Banner */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg">
               <div className="flex items-start justify-between">
@@ -274,28 +284,35 @@ export const App: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
 
-        {activeTab === 'switching' && <SwitchingWorkbench />}
-
-        {activeTab === 'capex' && <CapexPlanner />}
-
-        {activeTab === 'scenarios' && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-              Scenario Simulator Sandbox (Milestone 10)
-            </h3>
-            <p className="text-sm text-slate-400 max-w-md mx-auto">
-              In accordance with Non-negotiable Principle A4-11, this module is staged for delivery in its respective milestone.
-            </p>
-            <span className="inline-block px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono text-amber-400">
-              STATUS: STAGED IN PIPELINE
-            </span>
+          {/* Switching & FLISR Workbench */}
+          <div className={activeTab === 'switching' ? 'block' : 'hidden'}>
+            <SwitchingWorkbench />
           </div>
-        )}
+
+          {/* CAPEX Intelligence Planner */}
+          <div className={activeTab === 'capex' ? 'block' : 'hidden'}>
+            <CapexPlanner />
+          </div>
+
+          {/* Scenario Simulator Sandbox */}
+          <div className={activeTab === 'scenarios' ? 'block' : 'hidden'}>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+                Scenario Simulator Sandbox (Milestone 10)
+              </h3>
+              <p className="text-sm text-slate-400 max-w-md mx-auto">
+                In accordance with Non-negotiable Principle A4-11, this module is staged for delivery in its respective milestone.
+              </p>
+              <span className="inline-block px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono text-amber-400">
+                STATUS: STAGED IN PIPELINE
+              </span>
+            </div>
+          </div>
+        </div>
       </main>
 
       {/* Footer (hidden on full-bleed digital twin map) */}
