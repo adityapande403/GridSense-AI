@@ -66,14 +66,15 @@ def evaluate_dtr_investments(
         consumer_count = int(rated_kva * 4.2)
         # Simulate loading based on rating
         # DT-2011951-001 (Beach 2) or legacy DTR-15/DTR-19 simulate peak stress
-        if any(k in (dtr.code or "") for k in ["001", "15", "19"]):
+        dtr_suffix = (dtr.code or "").split("-")[-1]
+        if dtr_suffix == "001" or any(k in (dtr.code or "") for k in ["DTR_01", "DTR_03", "DTR-15", "DTR-19"]):
             peak_kva = rated_kva * 1.08  # 108% peak loading
             loading_pct = 108.0
             tail_v = 0.925
             health_idx = 48.0
             urgency = "HIGH"
             overloaded_count += 1
-        elif any(k in (dtr.code or "") for k in ["003", "18"]):
+        elif dtr_suffix == "003" or any(k in (dtr.code or "") for k in ["DTR-18"]):
             peak_kva = rated_kva * 0.88  # 88% elevated loading
             loading_pct = 88.0
             tail_v = 0.948
