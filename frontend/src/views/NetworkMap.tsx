@@ -9,6 +9,7 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
@@ -123,6 +124,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   const [heatmapActive, setHeatmapActive] = useState<boolean>(true);
   const [isContingencyModalOpen, setIsContingencyModalOpen] = useState<boolean>(false);
   const [contingencyReport, setContingencyReport] = useState<ContingencyReportData | null>(null);
+  const [forecastAlerts, setForecastAlerts] = useState<any | null>(null);
   const linePolylinesRef = useRef<{ [code: string]: L.Polyline }>({});
 
   const applyHeatmapStyles = (pfData: PowerFlowSummaryData | null, active: boolean) => {
@@ -500,6 +502,13 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
   useEffect(() => {
     fetchNetworkData(selectedFeeder);
+    // Fetch Milestone 7 Predictive Overload Early Warning Alerts
+    fetch(`/api/v1/forecast/feeder-alerts?feeder_code=${selectedFeeder}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((alerts) => {
+        if (alerts) setForecastAlerts(alerts);
+      })
+      .catch((err) => console.warn('Failed to fetch forecast alerts:', err));
   }, [selectedFeeder]);
 
   // 4. Dedicated Fit Bounds: ONLY runs when new feeder data bounds load, NEVER on asset selection!
@@ -1320,6 +1329,37 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
                 <AlertTriangle className="w-3 h-3 text-rose-400" />
                 <span>{data.summary.overloaded_dtrs_count} Overloaded</span>
               </div>
+            )}
+            {/* Predictive Overload Early Warning Alerts Pill (TR-FOR-05) */}
+            {forecastAlerts && forecastAlerts.active_alerts_count > 0 && (
+              <button
+                onClick={() => {
+                  const targetCode = forecastAlerts.alerts[0]?.dtr_code;
+                  if (targetCode && data?.transformers?.features) {
+                    const feat = data.transformers.features.find((f: any) => f.properties.code === targetCode);
+                    if (feat) {
+                      const coords = feat.geometry?.coordinates;
+                      setSelectedAsset({
+                        id: feat.properties.id,
+                        code: feat.properties.code,
+                        name: feat.properties.name,
+                        entity_type: 'distribution_transformer',
+                        provenance: 'predicted',
+                        confidence_score: 0.94,
+                        properties: {
+                          ...feat.properties,
+                          coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
+                        },
+                      });
+                    }
+                  }
+                }}
+                className="flex items-center space-x-1.5 bg-purple-950/90 hover:bg-purple-900 border border-purple-700/80 px-2 py-0.5 rounded-lg text-purple-200 transition-all font-bold animate-pulse cursor-pointer shadow-lg"
+                title={`${forecastAlerts.critical_alerts_count} Critical, ${forecastAlerts.warning_alerts_count} Warning Overloads Projected`}
+              >
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                <span>{forecastAlerts.active_alerts_count} Pred Overloads ({forecastAlerts.alerts[0]?.lead_time_hours}h-24h Ahead)</span>
+              </button>
             )}
             <button
               onClick={() => fetchNetworkData(selectedFeeder)}

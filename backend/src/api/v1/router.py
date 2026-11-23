@@ -9,6 +9,7 @@ from backend.src.api.v1.flisr import router as flisr_router
 from backend.src.api.v1.capex import router as capex_router
 from backend.src.api.v1.estimation import router as estimation_router
 from backend.src.api.v1.thermal import router as thermal_router
+from backend.src.api.v1.forecast import router as forecast_router
 from fastapi import APIRouter
 
 api_v1_router = APIRouter()
@@ -23,4 +24,5 @@ api_v1_router.include_router(flisr_router)
 api_v1_router.include_router(capex_router)
 api_v1_router.include_router(estimation_router)
 api_v1_router.include_router(thermal_router)
+api_v1_router.include_router(forecast_router)
 

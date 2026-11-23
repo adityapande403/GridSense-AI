@@ -14,6 +14,7 @@ import {
   Layers,
   AlertTriangle,
   Info,
+  Sparkles,
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
@@ -96,6 +97,52 @@ interface DTRThermalReport {
   disclaimer: string;
 }
 
+interface ForecastDataPoint {
+  horizon_hours: number;
+  horizon_label: string;
+  timestamp: string;
+  hour_of_day: number;
+  predicted_load_kw: number;
+  confidence_p10_kw: number;
+  confidence_p90_kw: number;
+  predicted_loading_pct: number;
+  status: string;
+  is_overload: boolean;
+  ambient_temp_c: number;
+  is_ag_shift_active: boolean;
+  model_name: string;
+  provenance: string;
+}
+
+interface ModelBenchmarkMetric {
+  horizon_hours: number;
+  horizon_label: string;
+  model_mae_kw: number;
+  model_rmse_kw: number;
+  model_mape_pct: number;
+  model_r2: number;
+  persistence_mae_kw: number;
+  persistence_mape_pct: number;
+  improvement_over_persistence_pct: number;
+}
+
+interface DTRForecastReport {
+  dtr_id: string;
+  dtr_code: string;
+  dtr_name: string;
+  rated_kva: number;
+  rated_kw: number;
+  current_load_kw: number;
+  current_loading_pct: number;
+  current_timestamp: string;
+  forecasts: ForecastDataPoint[];
+  benchmarks: ModelBenchmarkMetric[];
+  feature_importances: Record<string, number>;
+  validation_method: string;
+  provenance: string;
+  provenance_disclaimer: string;
+}
+
 interface AssetInspectionDrawerProps {
   asset: SelectedAsset | null;
   onClose: () => void;
@@ -103,36 +150,39 @@ interface AssetInspectionDrawerProps {
 
 export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ asset, onClose }) => {
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
-  const [dtrTab, setDtrTab] = useState<'overview' | 'estimation' | 'thermal'>(() => {
+  const [dtrTab, setDtrTab] = useState<'overview' | 'estimation' | 'thermal' | 'forecast'>(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('dtr_tab');
-      if (p === 'estimation' || p === 'thermal') return p;
+      if (p === 'estimation' || p === 'thermal' || p === 'forecast') return p;
     } catch {}
     return 'overview';
   });
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('dtr_tab');
-      if (p === 'estimation' || p === 'thermal') return true;
+      if (p === 'estimation' || p === 'thermal' || p === 'forecast') return true;
     } catch {}
     return false;
   });
 
-  // Milestone 6 State: Load Profile & Thermal Dynamics
+  // Milestone 6 & 7 State: Load Profile, Thermal Dynamics, ML Forecast
   const [loadProfile, setLoadProfile] = useState<DTRLoadProfileReport | null>(null);
   const [thermalReport, setThermalReport] = useState<DTRThermalReport | null>(null);
+  const [forecastReport, setForecastReport] = useState<DTRForecastReport | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+  const [hoveredForecastIdx, setHoveredForecastIdx] = useState<number | null>(null);
   const [meteringCoverage, setMeteringCoverage] = useState<number>(0);
 
   const props = asset?.properties || {};
 
-  // Fetch Milestone 6 data when a DTR is inspected
+  // Fetch Milestone 6 & 7 data when a DTR is inspected
   useEffect(() => {
     if (!asset || asset.entity_type !== 'distribution_transformer') {
       setLoadProfile(null);
       setThermalReport(null);
+      setForecastReport(null);
       return;
     }
 
@@ -151,11 +201,17 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
           if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch thermal dynamics`);
           return res.json();
         }),
+      fetch(`http://127.0.0.1:8000/api/v1/forecast/dtr?dtr_code=${encodeURIComponent(asset.code)}`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch ML forecast`);
+          return res.json();
+        }),
     ])
-      .then(([profile, thermal]) => {
+      .then(([profile, thermal, forecast]) => {
         if (isMounted) {
           setLoadProfile(profile);
           setThermalReport(thermal);
+          setForecastReport(forecast);
           setIsLoadingAnalytics(false);
         }
       })
@@ -392,6 +448,74 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
     };
   }, [thermalReport]);
 
+  // Helper calculation for ML Forecast SVG Quantile Cone Coordinates (TR-FOR-01..03)
+  const forecastChartData = useMemo(() => {
+    if (!forecastReport || !forecastReport.forecasts || forecastReport.forecasts.length === 0) return null;
+    const forecasts = forecastReport.forecasts;
+    const currentKw = forecastReport.current_load_kw;
+    const ratedKw = forecastReport.rated_kw;
+
+    // Cones: 0h (current), 1h, 4h, 8h, 24h
+    const pts = [
+      { h: 0, p10: currentKw, p50: currentKw, p90: currentKw, label: 'Now' },
+      ...forecasts.map((f) => ({
+        h: f.horizon_hours,
+        p10: f.confidence_p10_kw,
+        p50: f.predicted_load_kw,
+        p90: f.confidence_p90_kw,
+        label: `+${f.horizon_hours}h`,
+        data: f,
+      })),
+    ];
+
+    const maxVal = Math.max(...pts.map((p) => p.p90), ratedKw * 1.1, 40);
+    const minVal = 0;
+    const svgW = 460;
+    const svgH = 150;
+    const padL = 40;
+    const padR = 20;
+    const padT = 15;
+    const padB = 25;
+    const plotW = svgW - padL - padR;
+    const plotH = svgH - padT - padB;
+
+    // Even horizontal spacing across the 5 points (0, 1h, 4h, 8h, 24h)
+    const getX = (idx: number) => padL + (idx / (pts.length - 1)) * plotW;
+    const getY = (val: number) => padT + plotH - ((val - minVal) / (maxVal - minVal)) * plotH;
+
+    // Cone polygon: forward p90 then reverse p10
+    let conePoly = '';
+    pts.forEach((p, idx) => {
+      conePoly += `${getX(idx).toFixed(1)},${getY(p.p90).toFixed(1)} `;
+    });
+    for (let i = pts.length - 1; i >= 0; i--) {
+      conePoly += `${getX(i).toFixed(1)},${getY(pts[i].p10).toFixed(1)} `;
+    }
+
+    const p50Points = pts.map((p, idx) => `${getX(idx).toFixed(1)},${getY(p.p50).toFixed(1)}`).join(' ');
+    const ratedY = getY(ratedKw);
+
+    return {
+      svgW,
+      svgH,
+      padL,
+      padR,
+      padT,
+      padB,
+      plotW,
+      plotH,
+      maxVal,
+      minVal,
+      getX,
+      getY,
+      conePoly,
+      p50Points,
+      ratedKw,
+      ratedY,
+      pts,
+    };
+  }, [forecastReport]);
+
   return (
     <>
       <div
@@ -467,12 +591,12 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
           </div>
         </div>
 
-        {/* Milestone 6 Tab Bar for DTR */}
+        {/* Milestone 6 & 7 Tab Bar for DTR */}
         {isDtr && (
-          <div className="grid grid-cols-3 border-b border-slate-800 bg-slate-950/90 text-xs font-semibold">
+          <div className="grid grid-cols-4 border-b border-slate-800 bg-slate-950/90 text-xs font-semibold">
             <button
               onClick={() => setDtrTab('overview')}
-              className={`py-2.5 px-2 flex items-center justify-center space-x-1.5 border-b-2 transition-all ${
+              className={`py-2 px-1 flex items-center justify-center space-x-1 border-b-2 transition-all ${
                 dtrTab === 'overview'
                   ? 'border-blue-500 text-blue-400 bg-blue-950/30 font-bold'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -483,7 +607,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
             </button>
             <button
               onClick={() => setDtrTab('estimation')}
-              className={`py-2.5 px-2 flex items-center justify-center space-x-1.5 border-b-2 transition-all ${
+              className={`py-2 px-1 flex items-center justify-center space-x-1 border-b-2 transition-all ${
                 dtrTab === 'estimation'
                   ? 'border-cyan-500 text-cyan-400 bg-cyan-950/30 font-bold'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -494,7 +618,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
             </button>
             <button
               onClick={() => setDtrTab('thermal')}
-              className={`py-2.5 px-2 flex items-center justify-center space-x-1.5 border-b-2 transition-all ${
+              className={`py-2 px-1 flex items-center justify-center space-x-1 border-b-2 transition-all ${
                 dtrTab === 'thermal'
                   ? 'border-amber-500 text-amber-400 bg-amber-950/30 font-bold'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -502,6 +626,17 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
             >
               <Flame className="w-3.5 h-3.5" />
               <span>IEC Thermal</span>
+            </button>
+            <button
+              onClick={() => setDtrTab('forecast')}
+              className={`py-2 px-1 flex items-center justify-center space-x-1 border-b-2 transition-all ${
+                dtrTab === 'forecast'
+                  ? 'border-purple-500 text-purple-400 bg-purple-950/30 font-bold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>ML Forecast</span>
             </button>
           </div>
         )}
@@ -1261,6 +1396,347 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({ as
               ) : (
                 <div className="p-6 bg-slate-950 border border-slate-800 rounded-xl text-center text-xs text-slate-400">
                   {analyticsError ? `Error: ${analyticsError}` : 'No thermal dynamics data available.'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DTR TAB 4: PREDICTIVE ML FORECASTING (TR-FOR) */}
+          {isDtr && dtrTab === 'forecast' && (
+            <div className="space-y-4">
+              {isLoadingAnalytics ? (
+                <div className="p-8 text-center text-slate-400 font-mono text-xs flex flex-col items-center justify-center space-y-2">
+                  <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <span>Executing LightGBM Multi-Horizon Quantile Inference...</span>
+                </div>
+              ) : forecastReport ? (
+                <>
+                  {/* Current Operating Baseline vs. Projected Peak */}
+                  <div className="grid grid-cols-3 gap-2 font-mono text-center">
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <span className="text-[10px] text-slate-400 block uppercase">Current Active</span>
+                      <span className="text-sm font-bold text-white">{forecastReport.current_load_kw.toFixed(1)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">{forecastReport.current_loading_pct.toFixed(0)}% Load</span>
+                    </div>
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <span className="text-[10px] text-slate-400 block uppercase">24h Peak Pred</span>
+                      <span
+                        className={`text-sm font-bold ${
+                          (forecastReport.forecasts[3]?.predicted_loading_pct ?? 0) > 100
+                            ? 'text-rose-400'
+                            : (forecastReport.forecasts[3]?.predicted_loading_pct ?? 0) > 85
+                            ? 'text-amber-400'
+                            : 'text-purple-400'
+                        }`}
+                      >
+                        {forecastReport.forecasts[3]?.predicted_load_kw.toFixed(1) ?? 'N/A'} kW
+                      </span>
+                      <span className="text-[9px] text-slate-500 block">
+                        {forecastReport.forecasts[3]?.predicted_loading_pct.toFixed(0)}% Peak
+                      </span>
+                    </div>
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <span className="text-[10px] text-slate-400 block uppercase">Rated Capacity</span>
+                      <span className="text-sm font-bold text-slate-300">{forecastReport.rated_kw.toFixed(0)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">{forecastReport.rated_kva} kVA (0.9pf)</span>
+                    </div>
+                  </div>
+
+                  {/* 4 Multi-Horizon Forecast Cards (TR-FOR-01) */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-slate-300 font-mono block">
+                      Multi-Horizon GBDT Projections:
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                      {forecastReport.forecasts.map((fc) => (
+                        <div
+                          key={fc.horizon_hours}
+                          className={`p-2.5 rounded-xl border transition-all ${
+                            fc.status === 'CRITICAL_OVERLOAD'
+                              ? 'bg-rose-950/40 border-rose-800/80'
+                              : fc.status === 'NEAR_OVERLOAD'
+                              ? 'bg-amber-950/40 border-amber-800/80'
+                              : 'bg-slate-950/70 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-bold text-purple-400">+{fc.horizon_hours}H Ahead</span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                                fc.status === 'CRITICAL_OVERLOAD'
+                                  ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                  : fc.status === 'NEAR_OVERLOAD'
+                                  ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                                  : 'bg-slate-900 text-slate-400 border border-slate-800'
+                              }`}
+                            >
+                              {fc.predicted_loading_pct.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="text-sm font-bold text-white">{fc.predicted_load_kw.toFixed(1)} kW</div>
+                          <div className="text-[9px] text-slate-400 flex justify-between mt-1">
+                            <span>P10: {fc.confidence_p10_kw.toFixed(0)}k</span>
+                            <span>P90: {fc.confidence_p90_kw.toFixed(0)}k</span>
+                          </div>
+                          {fc.is_ag_shift_active && (
+                            <span className="inline-block mt-1 text-[8px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-1 py-0.2 rounded">
+                              Telangana Ag Shift
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Multi-Horizon Quantile Cone SVG Chart (TR-FOR-03) */}
+                  {forecastChartData && (
+                    <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Multi-Horizon Quantile Cone
+                        </span>
+                        <span className="text-[10px] text-slate-400">P10 - P50 - P90 Cones</span>
+                      </div>
+
+                      <div className="relative overflow-x-auto">
+                        <svg
+                          viewBox={`0 0 ${forecastChartData.svgW} ${forecastChartData.svgH}`}
+                          className="w-full h-40 select-none font-mono text-[9px]"
+                        >
+                          {/* Grid Lines */}
+                          <line
+                            x1={forecastChartData.padL}
+                            y1={forecastChartData.padT}
+                            x2={forecastChartData.svgW - forecastChartData.padR}
+                            y2={forecastChartData.padT}
+                            stroke="#334155"
+                            strokeDasharray="2 2"
+                            strokeWidth="0.7"
+                          />
+                          <line
+                            x1={forecastChartData.padL}
+                            y1={forecastChartData.padT + forecastChartData.plotH * 0.5}
+                            x2={forecastChartData.svgW - forecastChartData.padR}
+                            y2={forecastChartData.padT + forecastChartData.plotH * 0.5}
+                            stroke="#334155"
+                            strokeDasharray="2 2"
+                            strokeWidth="0.7"
+                          />
+                          <line
+                            x1={forecastChartData.padL}
+                            y1={forecastChartData.padT + forecastChartData.plotH}
+                            x2={forecastChartData.svgW - forecastChartData.padR}
+                            y2={forecastChartData.padT + forecastChartData.plotH}
+                            stroke="#475569"
+                            strokeWidth="1"
+                          />
+
+                          {/* Y-Axis Labels */}
+                          <text x={forecastChartData.padL - 6} y={forecastChartData.padT + 8} fill="#94a3b8" textAnchor="end">
+                            {forecastChartData.maxVal.toFixed(0)}k
+                          </text>
+                          <text
+                            x={forecastChartData.padL - 6}
+                            y={forecastChartData.padT + forecastChartData.plotH * 0.5 + 4}
+                            fill="#64748b"
+                            textAnchor="end"
+                          >
+                            {(forecastChartData.maxVal * 0.5).toFixed(0)}k
+                          </text>
+                          <text
+                            x={forecastChartData.padL - 6}
+                            y={forecastChartData.padT + forecastChartData.plotH}
+                            fill="#64748b"
+                            textAnchor="end"
+                          >
+                            0
+                          </text>
+
+                          {/* Rated Capacity Line */}
+                          {forecastChartData.ratedY >= forecastChartData.padT && (
+                            <>
+                              <line
+                                x1={forecastChartData.padL}
+                                y1={forecastChartData.ratedY}
+                                x2={forecastChartData.svgW - forecastChartData.padR}
+                                y2={forecastChartData.ratedY}
+                                stroke="#f43f5e"
+                                strokeDasharray="3 3"
+                                strokeWidth="1.2"
+                              />
+                              <text
+                                x={forecastChartData.svgW - forecastChartData.padR - 4}
+                                y={forecastChartData.ratedY - 4}
+                                fill="#fb7185"
+                                textAnchor="end"
+                                fontSize="8"
+                                fontWeight="bold"
+                              >
+                                Rated: {forecastChartData.ratedKw.toFixed(0)} kW
+                              </text>
+                            </>
+                          )}
+
+                          {/* Quantile Uncertainty Cone Polygon */}
+                          <polygon points={forecastChartData.conePoly} fill="rgba(168, 85, 247, 0.18)" stroke="none" />
+
+                          {/* P50 Median Line */}
+                          <polyline
+                            points={forecastChartData.p50Points}
+                            fill="none"
+                            stroke="#c084fc"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+
+                          {/* Data points */}
+                          {forecastChartData.pts.map((p, idx) => {
+                            const cx = forecastChartData.getX(idx);
+                            const cy = forecastChartData.getY(p.p50);
+                            const isHovered = hoveredForecastIdx === idx;
+
+                            return (
+                              <g key={idx}>
+                                {isHovered && (
+                                  <line
+                                    x1={cx}
+                                    y1={forecastChartData.padT}
+                                    x2={cx}
+                                    y2={forecastChartData.padT + forecastChartData.plotH}
+                                    stroke="#c084fc"
+                                    strokeDasharray="2 2"
+                                    strokeWidth="1"
+                                  />
+                                )}
+                                <circle
+                                  cx={cx}
+                                  cy={cy}
+                                  r={isHovered ? 5 : 3}
+                                  fill={isHovered ? '#e9d5ff' : '#a855f7'}
+                                  stroke={isHovered ? '#ffffff' : '#7e22ce'}
+                                  strokeWidth={isHovered ? 2 : 1}
+                                  className="cursor-pointer transition-all"
+                                  onMouseEnter={() => setHoveredForecastIdx(idx)}
+                                  onMouseLeave={() => setHoveredForecastIdx(null)}
+                                />
+                                <text
+                                  x={cx}
+                                  y={forecastChartData.padT + forecastChartData.plotH + 15}
+                                  fill="#94a3b8"
+                                  textAnchor="middle"
+                                  fontSize="8"
+                                >
+                                  {p.label}
+                                </text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+
+                      {/* Interactive Hover Snapshot Strip */}
+                      {hoveredForecastIdx !== null && forecastChartData.pts[hoveredForecastIdx] && (
+                        <div className="bg-slate-900 border border-purple-800/80 rounded-lg p-2 font-mono text-[11px] animate-in fade-in duration-150">
+                          <div className="flex justify-between items-center text-purple-300 font-bold border-b border-purple-900/50 pb-1 mb-1">
+                            <span>Horizon {forecastChartData.pts[hoveredForecastIdx].label} Snapshot</span>
+                            <span className="text-white font-bold">
+                              {forecastChartData.pts[hoveredForecastIdx].p50.toFixed(1)} kW
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-slate-300 text-[10px]">
+                            <span>P10: {forecastChartData.pts[hoveredForecastIdx].p10.toFixed(1)} kW</span>
+                            <span>P90: {forecastChartData.pts[hoveredForecastIdx].p90.toFixed(1)} kW</span>
+                            <span className="text-purple-400">
+                              Spread: ±{((forecastChartData.pts[hoveredForecastIdx].p90 - forecastChartData.pts[hoveredForecastIdx].p10) * 0.5).toFixed(1)} kW
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Model vs Persistence Benchmark Scorecard (TR-FOR-02) */}
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2 font-mono text-xs">
+                    <span className="text-[11px] font-bold text-slate-300 block">
+                      Chronological Walk-Forward Benchmarks (LightGBM vs Persistence):
+                    </span>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-[10px]">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-400">
+                            <th className="py-1">Horizon</th>
+                            <th className="py-1">GBDT MAE</th>
+                            <th className="py-1">GBDT MAPE</th>
+                            <th className="py-1">Persistence</th>
+                            <th className="py-1 text-right">Accuracy Gain</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {forecastReport.benchmarks.map((b) => (
+                            <tr key={b.horizon_hours} className="hover:bg-slate-900/50">
+                              <td className="py-1 font-bold text-purple-400">+{b.horizon_hours}h</td>
+                              <td className="py-1 text-white">{b.model_mae_kw} kW</td>
+                              <td className="py-1 text-cyan-300">{b.model_mape_pct}%</td>
+                              <td className="py-1 text-slate-400">{b.persistence_mape_pct}%</td>
+                              <td className="py-1 text-right font-bold text-emerald-400">
+                                +{b.improvement_over_persistence_pct}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Top Feature Importances (TR-FOR-04) */}
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2 font-mono text-xs">
+                    <span className="text-[11px] font-semibold text-slate-300 block">
+                      Top GBDT Predictive Drivers (Telangana Operations):
+                    </span>
+                    <div className="space-y-1.5 text-[10px]">
+                      {Object.entries(forecastReport.feature_importances)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 4)
+                        .map(([feat, score]) => (
+                          <div key={feat} className="space-y-0.5">
+                            <div className="flex justify-between text-slate-400">
+                              <span className="capitalize">
+                                {feat === 'is_ag_shift'
+                                  ? 'Telangana 7h Ag Pumping Shift'
+                                  : feat === 'ambient_temp_c'
+                                  ? 'Ambient Temperature Peak'
+                                  : feat === 'lag_1h'
+                                  ? 'Prior Hour SCADA Telemetry'
+                                  : feat === 'rolling_mean_3h'
+                                  ? 'Rolling 3h Baseline Demand'
+                                  : feat.replace('_', ' ')}
+                              </span>
+                              <span className="text-purple-300 font-bold">{(score * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-500 rounded-full"
+                                style={{ width: `${Math.min(100, score * 250)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Provenance Disclaimer (Principle A4-7) */}
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex items-center space-x-1.5 text-purple-400 font-semibold">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Predictive ML Provenance Lineage (TR-FOR-05)</span>
+                    </div>
+                    <p className="leading-relaxed">{forecastReport.provenance_disclaimer}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="p-6 bg-slate-950 border border-slate-800 rounded-xl text-center text-xs text-slate-400">
+                  {analyticsError ? `Error: ${analyticsError}` : 'No predictive forecast data available.'}
                 </div>
               )}
             </div>
