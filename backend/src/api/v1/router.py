@@ -6,6 +6,7 @@ from backend.src.api.v1.physics import router as physics_router
 from backend.src.api.v1.topology import router as topology_router
 from backend.src.api.v1.switching import router as switching_router
 from backend.src.api.v1.flisr import router as flisr_router
+from backend.src.api.v1.capex import router as capex_router
 from fastapi import APIRouter
 
 api_v1_router = APIRouter()
@@ -17,4 +18,5 @@ api_v1_router.include_router(topology_router)
 api_v1_router.include_router(physics_router)
 api_v1_router.include_router(switching_router)
 api_v1_router.include_router(flisr_router)
+api_v1_router.include_router(capex_router)
 

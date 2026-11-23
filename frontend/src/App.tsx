@@ -4,6 +4,7 @@ import { ProvenanceBadge } from './components/ProvenanceBadge';
 import { StatusBadge } from './components/StatusBadge';
 import { NetworkMap } from './views/NetworkMap';
 import { SwitchingWorkbench } from './views/SwitchingWorkbench';
+import { CapexPlanner } from './views/CapexPlanner';
 
 interface SystemHealth {
   status: string;
@@ -27,7 +28,7 @@ export const App: React.FC = () => {
     if (tabParam && ['overview', 'map', 'switching', 'capex', 'scenarios'].includes(tabParam)) {
       return tabParam as any;
     }
-    return 'switching'; // Default to switching for Milestone 8 demonstration
+    return 'capex'; // Default to capex for Milestone 9 demonstration
   });
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
@@ -277,15 +278,15 @@ export const App: React.FC = () => {
 
         {activeTab === 'switching' && <SwitchingWorkbench />}
 
-        {(activeTab === 'capex' || activeTab === 'scenarios') && (
+        {activeTab === 'capex' && <CapexPlanner />}
+
+        {activeTab === 'scenarios' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
               <ShieldAlert className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-              {activeTab === 'capex'
-                ? 'CAPEX Intelligence Planner (Milestone 9)'
-                : 'Scenario Simulator Sandbox (Milestone 10)'}
+              Scenario Simulator Sandbox (Milestone 10)
             </h3>
             <p className="text-sm text-slate-400 max-w-md mx-auto">
               In accordance with Non-negotiable Principle A4-11, this module is staged for delivery in its respective milestone.
