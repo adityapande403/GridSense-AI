@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
+import { DTRClusterZoomWindow } from '../components/DTRClusterZoomWindow';
 import { GISLeftDock } from '../components/GISLeftDock';
 import { PowerFlowSummaryData } from '../components/PhysicsSimulationBar';
 import { ContingencyModal, ContingencyReportData } from '../components/ContingencyModal';
@@ -111,6 +112,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   const [selectedFeeder, setSelectedFeeder] = useState<string>('2011951');
   const [baseMap, setBaseMap] = useState<BaseMapType>('carto-voyager');
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
+  const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(false);
+  const [selectedDTR, setSelectedDTR] = useState<SelectedAsset | null>(null);
+  const [selectedClusterAsset, setSelectedClusterAsset] = useState<SelectedAsset | null>(null);
   const [isDockOpen, setIsDockOpen] = useState<boolean>(true);
   const [dockTab, setDockTab] = useState<'physics' | 'layers' | 'settings'>('physics');
 
@@ -494,6 +498,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
                 },
               };
               setSelectedAsset(dtrAsset);
+              setSelectedDTR(dtrAsset);
+              setSelectedClusterAsset(dtrAsset);
+              setIsClusterZoomOpen(true);
               if (coords) {
                 mapInstanceRef.current?.flyTo([coords[1], coords[0]], 19.5, { duration: 0.8 });
               }
@@ -512,6 +519,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
   useEffect(() => {
     setSelectedAsset(null);
+    setSelectedClusterAsset(null);
+    setIsClusterZoomOpen(false);
     fetchNetworkData(selectedFeeder);
     // Fetch Milestone 7 Predictive Overload Early Warning Alerts
     fetch(`/api/v1/forecast/feeder-alerts?feeder_code=${selectedFeeder}`)
@@ -563,6 +572,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           },
         };
         setSelectedAsset(poleAsset);
+        setSelectedClusterAsset(poleAsset);
+        setIsClusterZoomOpen(true);
         if (coords) {
           mapInstanceRef.current?.flyTo([coords[1], coords[0]], 20, { duration: 0.8 });
         }
@@ -587,6 +598,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           },
         };
         setSelectedAsset(dtrAsset);
+        setSelectedDTR(dtrAsset);
+        setSelectedClusterAsset(dtrAsset);
+        setIsClusterZoomOpen(true);
         if (coords) {
           mapInstanceRef.current?.flyTo([coords[1], coords[0]], 19.5, { duration: 0.8 });
         }
@@ -773,6 +787,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           };
 
           setSelectedAsset(lineAsset);
+          setSelectedClusterAsset(lineAsset);
+          setIsClusterZoomOpen(true);
           mapInstanceRef.current?.flyTo([midPoint[1], midPoint[0]], 19, { duration: 0.8 });
         });
 
@@ -910,6 +926,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         circleMarker.on('click', () => {
           mapInstanceRef.current?.closePopup();
           setSelectedAsset(poleAsset);
+          setSelectedClusterAsset(poleAsset);
+          setIsClusterZoomOpen(true);
           mapInstanceRef.current?.flyTo([lat, lon], 20, { duration: 0.8 });
         });
 
@@ -999,6 +1017,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
             },
           };
           setSelectedAsset(subAsset);
+          setSelectedClusterAsset(subAsset);
+          setIsClusterZoomOpen(true);
           mapInstanceRef.current?.flyTo([lat, lon], 18, { duration: 0.8 });
         });
 
@@ -1104,6 +1124,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
             },
           };
           setSelectedAsset(swAsset);
+          setSelectedClusterAsset(swAsset);
+          setIsClusterZoomOpen(true);
           mapInstanceRef.current?.flyTo([lat, lon], 20, { duration: 0.8 });
         });
 
@@ -1207,6 +1229,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
             },
           };
           setSelectedAsset(dtrAsset);
+          setSelectedDTR(dtrAsset);
+          setSelectedClusterAsset(dtrAsset);
+          setIsClusterZoomOpen(true);
           mapInstanceRef.current?.flyTo([lat, lon], 19.5, { duration: 0.8 });
         });
 
@@ -1240,6 +1265,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       activePolylineRef.current = null;
     }
     setSelectedAsset(null);
+    setIsClusterZoomOpen(false);
   };
 
   return (
@@ -1337,7 +1363,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
                     const feat = data.transformers.features.find((f: any) => f.properties.code === targetCode);
                     if (feat) {
                       const coords = feat.geometry?.coordinates;
-                      setSelectedAsset({
+                      const dtrAsset: SelectedAsset = {
                         id: feat.properties.id,
                         code: feat.properties.code,
                         name: feat.properties.name,
@@ -1348,7 +1374,11 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
                           ...feat.properties,
                           coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
                         },
-                      });
+                      };
+                      setSelectedAsset(dtrAsset);
+                      setSelectedDTR(dtrAsset);
+                      setSelectedClusterAsset(dtrAsset);
+                      setIsClusterZoomOpen(true);
                       if (coords) {
                         mapInstanceRef.current?.flyTo([coords[1], coords[0]], 19.5, { duration: 0.8 });
                       }
@@ -1474,11 +1504,36 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         <span>TOPOLOGICAL CONSISTENCY: 100% GIS ALIGNED &bull; 553 LINES &bull; 608 POLES &bull; 4 DTRS</span>
       </div>
 
-      {/* 8. Slide-in Asset Inspection Drawer */}
+      {/* 8. Unified High-Resolution Cluster Magnifier Window */}
+      <DTRClusterZoomWindow
+        isOpen={isClusterZoomOpen && selectedClusterAsset !== null}
+        onClose={() => setIsClusterZoomOpen(false)}
+        clusterAsset={selectedClusterAsset}
+        dtr={selectedDTR}
+        networkData={data}
+        baseMap={baseMap}
+        isDrawerOpen={selectedAsset !== null}
+        showHTLines={showHTLines}
+        showLTLines={showLTLines}
+        showPoles={showPoles}
+        showDPStructures={showDPStructures}
+        showDTRs={showDTRs}
+        showSwitches={showSwitches}
+        selectedAsset={selectedAsset}
+        onSelectAsset={(asset) => {
+          setSelectedAsset(asset);
+          setSelectedClusterAsset(asset);
+          setIsClusterZoomOpen(true);
+        }}
+      />
+
+      {/* 9. Slide-in Asset Inspection Drawer */}
       {selectedAsset && (
         <AssetInspectionDrawer
           asset={selectedAsset}
           onClose={handleCloseDrawer}
+          onOpenClusterZoom={() => setIsClusterZoomOpen((prev) => !prev)}
+          isClusterZoomOpen={isClusterZoomOpen}
         />
       )}
     </div>
