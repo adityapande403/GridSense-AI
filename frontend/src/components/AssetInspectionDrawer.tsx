@@ -239,11 +239,10 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
     };
   }, [asset?.code, asset?.entity_type]);
 
-  if (!asset) return null;
-
-  const isDtr = asset.entity_type === 'distribution_transformer';
+  const isDtr = asset?.entity_type === 'distribution_transformer';
 
   const openCalculationInspection = () => {
+    if (!asset) return;
     if (isDtr) {
       const ratedKva = props.rated_kva || loadProfile?.rated_kva || 100.0;
       const peakDemandKw = loadProfile?.peak_demand_kw || (ratedKva * 0.75 * 0.9);
@@ -526,6 +525,8 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
       pts,
     };
   }, [forecastReport]);
+
+  if (!asset) return null;
 
   return (
     <>

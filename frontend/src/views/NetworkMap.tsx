@@ -1505,11 +1505,13 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       />
 
       {/* 9. Slide-in Asset Inspection Drawer */}
-      <AssetInspectionDrawer
-        asset={selectedAsset}
-        onClose={handleCloseDrawer}
-        onOpenClusterZoom={() => setIsClusterZoomOpen(true)}
-      />
+      {selectedAsset && (
+        <AssetInspectionDrawer
+          asset={selectedAsset}
+          onClose={handleCloseDrawer}
+          onOpenClusterZoom={() => setIsClusterZoomOpen(true)}
+        />
+      )}
     </div>
   );
 };

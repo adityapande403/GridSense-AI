@@ -25,10 +25,8 @@ interface CalculationModalProps {
 }
 
 export const CalculationModal: React.FC<CalculationModalProps> = ({ isOpen, onClose, details }) => {
-  if (!isOpen || !details) return null;
-
   const renderedFormulaHtml = useMemo(() => {
-    if (!details.latexFormula) return null;
+    if (!isOpen || !details || !details.latexFormula) return null;
     try {
       return katex.renderToString(details.latexFormula, {
         throwOnError: false,
@@ -38,7 +36,9 @@ export const CalculationModal: React.FC<CalculationModalProps> = ({ isOpen, onCl
       console.error('KaTeX rendering error:', e);
       return null;
     }
-  }, [details.latexFormula]);
+  }, [isOpen, details]);
+
+  if (!isOpen || !details) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
