@@ -345,13 +345,22 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     }
 
     if (!mapInstanceRef.current) {
+      if ((mapContainerRef.current as any)._leaflet_id) {
+        delete (mapContainerRef.current as any)._leaflet_id;
+      }
       const center = centerCoords || [11.270127, 75.765721];
-      const map = L.map(mapContainerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        minZoom: 18,
-        maxZoom: 24, // Allow ultra high zoom up to 24x
-      }).setView(center, 21.5);
+      let map: L.Map;
+      try {
+        map = L.map(mapContainerRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+          minZoom: 18,
+          maxZoom: 24, // Allow ultra high zoom up to 24x
+        }).setView(center, 21.5);
+      } catch (err) {
+        console.warn('Leaflet cluster zoom window initialization guard:', err);
+        return;
+      }
 
       let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
       let nativeZoom = 18;
@@ -534,7 +543,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         lineJoin: 'round',
       });
 
-      const lengthMeters = (lineFeat.properties.length_km * 1000).toFixed(0);
+      const lengthMeters = ((lineFeat.properties.length_km || 0) * 1000).toFixed(0);
 
       polyline.bindTooltip(
         `

@@ -20,6 +20,11 @@ import {
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
 
+export const fmtNum = (val: number | null | undefined, digits = 1, fallback = 'N/A'): string => {
+  if (val === null || val === undefined || isNaN(Number(val))) return fallback;
+  return Number(val).toFixed(digits);
+};
+
 export interface SelectedAsset {
   id: string;
   code: string;
@@ -256,7 +261,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           'Dynamic thermal simulation of oil and winding temperatures per IEC 60076-7 differential equations, coupled with top-down feeder SCADA disaggregation across domestic, commercial, industrial, and agricultural consumer archetypes.',
         inputs: {
           'Rated Capacity (kVA)': ratedKva,
-          'Peak Demand (kW)': peakDemandKw.toFixed(1),
+          'Peak Demand (kW)': fmtNum(peakDemandKw, 1),
           'Top-Oil Time Constant (τ_o)': '150 min (2.5 hrs)',
           'Hot-Spot Time Constant (τ_h)': '7 min',
           'Loss Ratio (R = P_cu / P_fe)': '4.50',
@@ -299,7 +304,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           ? `Thermal Loading: ${pf.loading_percent}% (Loss: ${pf.active_loss_kw} kW)`
           : 'Branch Series Impedance (Z = R + jX)',
         formula: pf
-          ? `P_loss = 3 * I^2 * R * L = 3 * (${(pf.current_ka * 1000).toFixed(1)} A)^2 * ${rOhm} Ω/km * ${lengthKm} km = ${pf.active_loss_kw} kW`
+          ? `P_loss = 3 * I^2 * R * L = 3 * (${fmtNum(pf.current_ka * 1000, 1)} A)^2 * ${rOhm} Ω/km * ${lengthKm} km = ${pf.active_loss_kw} kW`
           : 'Z_branch = (r_ohm_per_km + j * x_ohm_per_km) * length_km',
         latexFormula: pf
           ? 'P_{\\text{loss}} = 3 \\cdot I_{\\text{line}}^2 \\cdot R_{\\text{cond}} \\cdot L_{\\text{km}}'
@@ -312,18 +317,18 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           'Total Length (km)': lengthKm,
           'Resistance R (Ω/km)': rOhm,
           'Reactance X (Ω/km)': xOhm,
-          'Total Branch Resistance (Ω)': (rOhm * lengthKm).toFixed(4),
-          'Total Branch Reactance (Ω)': (xOhm * lengthKm).toFixed(4),
+          'Total Branch Resistance (Ω)': fmtNum(rOhm * lengthKm, 4),
+          'Total Branch Reactance (Ω)': fmtNum(xOhm * lengthKm, 4),
           ...(pf
             ? {
-                'Operating Current (A)': (pf.current_ka * 1000).toFixed(1),
+                'Operating Current (A)': fmtNum(pf.current_ka * 1000, 1),
                 'Active Technical Loss (kW)': pf.active_loss_kw,
                 'Reactive Technical Loss (kVAr)': pf.reactive_loss_kvar,
-                'Derated Ampacity (A)': (pf.max_i_ka * 1000).toFixed(1),
+                'Derated Ampacity (A)': fmtNum(pf.max_i_ka * 1000, 1),
                 'Pandapower Loading (%)': `${pf.loading_percent}%`,
               }
             : {
-                'Thermal Ampacity (A)': maxAmp.toFixed(0),
+                'Thermal Ampacity (A)': fmtNum(maxAmp, 0),
               }),
         },
         assumptions: [
@@ -558,7 +563,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                 <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400">
                   {asset.entity_type.replace('_', ' ')}
                 </span>
-                {isDtr && thermalReport && (
+                {isDtr && thermalReport && thermalReport.asset_health_index != null && (
                   <span
                     className={`text-[10px] font-bold font-mono px-1.5 py-0.2 rounded border ${
                       thermalReport.asset_health_index >= 85
@@ -568,7 +573,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                         : 'bg-rose-950/70 text-rose-300 border-rose-800'
                     }`}
                   >
-                    AHI: {thermalReport.asset_health_index.toFixed(0)}
+                    AHI: {fmtNum(thermalReport.asset_health_index, 0)}
                   </span>
                 )}
               </div>
@@ -666,7 +671,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
               <ProvenanceBadge provenance={isDtr ? 'estimated' : asset.provenance} />
               {asset.confidence_score && (
                 <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/60 px-2 py-0.5 rounded">
-                  {(asset.confidence_score * 100).toFixed(0)}%
+                  {fmtNum(asset.confidence_score * 100, 0)}%
                 </span>
               )}
             </div>
@@ -720,7 +725,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                 <div className="flex justify-between py-1 border-b border-slate-800/60">
                   <span className="text-slate-400">Sanctioned Load:</span>
                   <span className="text-slate-200">
-                    {loadProfile?.total_sanctioned_load_kw?.toFixed(1) ?? '185.0'} kW
+                    {fmtNum(loadProfile?.total_sanctioned_load_kw, 1, '185.0')} kW
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-800/60">
@@ -759,18 +764,18 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   <div className="grid grid-cols-3 gap-2 font-mono text-center">
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Peak Demand</span>
-                      <span className="text-sm font-bold text-cyan-400">{loadProfile.peak_demand_kw.toFixed(1)} kW</span>
-                      <span className="text-[9px] text-slate-500 block">@ {loadProfile.peak_hour}:00 hrs</span>
+                      <span className="text-sm font-bold text-cyan-400">{fmtNum(loadProfile.peak_demand_kw, 1)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">@ {loadProfile.peak_hour ?? 14}:00 hrs</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Load Factor</span>
-                      <span className="text-sm font-bold text-blue-400">{loadProfile.load_factor.toFixed(2)}</span>
+                      <span className="text-sm font-bold text-blue-400">{fmtNum(loadProfile.load_factor, 2)}</span>
                       <span className="text-[9px] text-slate-500 block">Avg/Peak</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Rated Capacity</span>
-                      <span className="text-sm font-bold text-white">{(loadProfile.rated_kva * 0.9).toFixed(0)} kW</span>
-                      <span className="text-[9px] text-slate-500 block">{loadProfile.rated_kva} kVA @ 0.9pf</span>
+                      <span className="text-sm font-bold text-white">{fmtNum(loadProfile.rated_kva * 0.9, 0)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">{loadProfile.rated_kva ?? 100} kVA @ 0.9pf</span>
                     </div>
                   </div>
 
@@ -850,7 +855,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
 
                           {/* Y Axis Labels */}
                           <text x={loadChartData.padL - 6} y={loadChartData.padT + 8} fill="#94a3b8" textAnchor="end">
-                            {loadChartData.maxVal.toFixed(0)}k
+                            {fmtNum(loadChartData.maxVal, 0)}k
                           </text>
                           <text
                             x={loadChartData.padL - 6}
@@ -858,7 +863,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             fill="#64748b"
                             textAnchor="end"
                           >
-                            {(loadChartData.maxVal * 0.5).toFixed(0)}k
+                            {fmtNum(loadChartData.maxVal * 0.5, 0)}k
                           </text>
                           <text
                             x={loadChartData.padL - 6}
@@ -889,7 +894,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                                 fontSize="8"
                                 fontWeight="bold"
                               >
-                                Rated: {loadChartData.ratedKw.toFixed(0)} kW
+                                Rated: {fmtNum(loadChartData.ratedKw, 0)} kW
                               </text>
                             </>
                           )}
@@ -964,50 +969,50 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             <span>Hour {String(hoveredHour).padStart(2, '0')}:00 Snapshot</span>
                             <span
                               className={`px-1.5 py-0.2 rounded text-[10px] ${
-                                loadProfile.time_series[hoveredHour].loading_pct > 100
+                                (loadProfile.time_series[hoveredHour].loading_pct ?? 0) > 100
                                   ? 'bg-rose-950 text-rose-300 border border-rose-800'
                                   : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
                               }`}
                             >
-                              {loadProfile.time_series[hoveredHour].loading_pct.toFixed(1)}% Load
+                              {fmtNum(loadProfile.time_series[hoveredHour].loading_pct, 1)}% Load
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-slate-300 text-[10px]">
                             <div>
                               P50 Estimate:{' '}
                               <span className="text-white font-bold">
-                                {loadProfile.time_series[hoveredHour].p50_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].p50_kw, 1)} kW
                               </span>
                             </div>
                             <div>
                               P10 - P90 Band:{' '}
                               <span className="text-cyan-300">
-                                {loadProfile.time_series[hoveredHour].p10_kw.toFixed(1)} -{' '}
-                                {loadProfile.time_series[hoveredHour].p90_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].p10_kw, 1)} -{' '}
+                                {fmtNum(loadProfile.time_series[hoveredHour].p90_kw, 1)} kW
                               </span>
                             </div>
                             <div>
                               Domestic:{' '}
                               <span className="text-blue-300">
-                                {loadProfile.time_series[hoveredHour].domestic_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].domestic_kw, 1)} kW
                               </span>
                             </div>
                             <div>
                               Commercial:{' '}
                               <span className="text-purple-300">
-                                {loadProfile.time_series[hoveredHour].commercial_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].commercial_kw, 1)} kW
                               </span>
                             </div>
                             <div>
                               Industrial:{' '}
                               <span className="text-amber-300">
-                                {loadProfile.time_series[hoveredHour].industrial_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].industrial_kw, 1)} kW
                               </span>
                             </div>
                             <div>
                               Ag Pumping (7h):{' '}
                               <span className="text-emerald-300">
-                                {loadProfile.time_series[hoveredHour].agricultural_kw.toFixed(1)} kW
+                                {fmtNum(loadProfile.time_series[hoveredHour].agricultural_kw, 1)} kW
                               </span>
                             </div>
                           </div>
@@ -1034,7 +1039,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                         <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
                           <span>0% (Feeder SCADA only)</span>
                           <span className="text-cyan-400">
-                            Uncertainty Width: -{(meteringCoverage * 1.25).toFixed(0)}%
+                            Uncertainty Width: -{fmtNum(meteringCoverage * 1.25, 0)}%
                           </span>
                           <span>50% (Smart Grids)</span>
                         </div>
@@ -1095,7 +1100,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             : 'text-rose-400'
                         }`}
                       >
-                        {thermalReport.asset_health_index.toFixed(1)} / 100
+                        {fmtNum(thermalReport.asset_health_index, 1)} / 100
                       </span>
                     </div>
 
@@ -1120,7 +1125,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                       <div>
                         Life Loss:{' '}
                         <span className="font-bold text-amber-400">
-                          {thermalReport.cumulative_aging_hours_24h.toFixed(1)} h/day
+                          {fmtNum(thermalReport.cumulative_aging_hours_24h, 1)} h/day
                         </span>
                       </div>
                       <div>
@@ -1153,21 +1158,21 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             : 'text-emerald-400'
                         }`}
                       >
-                        {thermalReport.peak_hot_spot_temp_c.toFixed(1)}°C
+                        {fmtNum(thermalReport.peak_hot_spot_temp_c, 1)}°C
                       </span>
                       <span className="text-[9px] text-slate-500 block">θ_h (Winding)</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Peak Top-Oil</span>
                       <span className="text-sm font-bold text-orange-400">
-                        {thermalReport.peak_top_oil_temp_c.toFixed(1)}°C
+                        {fmtNum(thermalReport.peak_top_oil_temp_c, 1)}°C
                       </span>
                       <span className="text-[9px] text-slate-500 block">θ_o (Oil Rise)</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Peak Ambient</span>
                       <span className="text-sm font-bold text-slate-300">
-                        {thermalReport.peak_ambient_temp_c.toFixed(1)}°C
+                        {fmtNum(thermalReport.peak_ambient_temp_c, 1)}°C
                       </span>
                       <span className="text-[9px] text-slate-500 block">θ_a (Telangana)</span>
                     </div>
@@ -1228,7 +1233,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
 
                           {/* Y Axis Labels */}
                           <text x={thermalChartData.padL - 6} y={thermalChartData.padT + 8} fill="#94a3b8" textAnchor="end">
-                            {thermalChartData.maxVal.toFixed(0)}°
+                            {fmtNum(thermalChartData.maxVal, 0)}°
                           </text>
                           <text
                             x={thermalChartData.padL - 6}
@@ -1236,7 +1241,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             fill="#64748b"
                             textAnchor="end"
                           >
-                            {((thermalChartData.maxVal + thermalChartData.minVal) * 0.5).toFixed(0)}°
+                            {fmtNum((thermalChartData.maxVal + thermalChartData.minVal) * 0.5, 0)}°
                           </text>
                           <text
                             x={thermalChartData.padL - 6}
@@ -1358,37 +1363,37 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             <span>Hour {String(hoveredHour).padStart(2, '0')}:00 Thermal State</span>
                             <span
                               className={`px-1.5 py-0.2 rounded text-[10px] ${
-                                thermalReport.time_series[hoveredHour].hot_spot_temp_c >= 120
+                                (thermalReport.time_series[hoveredHour].hot_spot_temp_c ?? 0) >= 120
                                   ? 'bg-rose-950 text-rose-300 border border-rose-800'
                                   : 'bg-amber-950 text-amber-300 border border-amber-800'
                               }`}
                             >
-                              Aging V = {thermalReport.time_series[hoveredHour].relative_aging_rate.toFixed(2)}x
+                              Aging V = {fmtNum(thermalReport.time_series[hoveredHour].relative_aging_rate, 2)}x
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-slate-300 text-[10px]">
                             <div>
                               Hot-Spot θ_h:{' '}
                               <span className="text-amber-400 font-bold">
-                                {thermalReport.time_series[hoveredHour].hot_spot_temp_c.toFixed(1)}°C
+                                {fmtNum(thermalReport.time_series[hoveredHour].hot_spot_temp_c, 1)}°C
                               </span>
                             </div>
                             <div>
                               Top-Oil θ_o:{' '}
                               <span className="text-orange-400">
-                                {thermalReport.time_series[hoveredHour].top_oil_temp_c.toFixed(1)}°C
+                                {fmtNum(thermalReport.time_series[hoveredHour].top_oil_temp_c, 1)}°C
                               </span>
                             </div>
                             <div>
                               Ambient θ_a:{' '}
                               <span className="text-slate-400">
-                                {thermalReport.time_series[hoveredHour].ambient_temp_c.toFixed(1)}°C
+                                {fmtNum(thermalReport.time_series[hoveredHour].ambient_temp_c, 1)}°C
                               </span>
                             </div>
                             <div>
                               Life Loss/Hour:{' '}
                               <span className="text-white">
-                                {thermalReport.time_series[hoveredHour].loss_of_life_hours.toFixed(2)} hrs
+                                {fmtNum(thermalReport.time_series[hoveredHour].loss_of_life_hours, 2)} hrs
                               </span>
                             </div>
                           </div>
@@ -1431,30 +1436,30 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   <div className="grid grid-cols-3 gap-2 font-mono text-center">
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Current Active</span>
-                      <span className="text-sm font-bold text-white">{forecastReport.current_load_kw.toFixed(1)} kW</span>
-                      <span className="text-[9px] text-slate-500 block">{forecastReport.current_loading_pct.toFixed(0)}% Load</span>
+                      <span className="text-sm font-bold text-white">{fmtNum(forecastReport.current_load_kw, 1)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">{fmtNum(forecastReport.current_loading_pct, 0)}% Load</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">24h Peak Pred</span>
                       <span
                         className={`text-sm font-bold ${
-                          (forecastReport.forecasts[3]?.predicted_loading_pct ?? 0) > 100
+                          (forecastReport.forecasts?.[3]?.predicted_loading_pct ?? 0) > 100
                             ? 'text-rose-400'
-                            : (forecastReport.forecasts[3]?.predicted_loading_pct ?? 0) > 85
+                            : (forecastReport.forecasts?.[3]?.predicted_loading_pct ?? 0) > 85
                             ? 'text-amber-400'
                             : 'text-purple-400'
                         }`}
                       >
-                        {forecastReport.forecasts[3]?.predicted_load_kw.toFixed(1) ?? 'N/A'} kW
+                        {fmtNum(forecastReport.forecasts?.[3]?.predicted_load_kw, 1)} kW
                       </span>
                       <span className="text-[9px] text-slate-500 block">
-                        {forecastReport.forecasts[3]?.predicted_loading_pct.toFixed(0)}% Peak
+                        {fmtNum(forecastReport.forecasts?.[3]?.predicted_loading_pct, 0)}% Peak
                       </span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Rated Capacity</span>
-                      <span className="text-sm font-bold text-slate-300">{forecastReport.rated_kw.toFixed(0)} kW</span>
-                      <span className="text-[9px] text-slate-500 block">{forecastReport.rated_kva} kVA (0.9pf)</span>
+                      <span className="text-sm font-bold text-slate-300">{fmtNum(forecastReport.rated_kw, 0)} kW</span>
+                      <span className="text-[9px] text-slate-500 block">{forecastReport.rated_kva ?? 100} kVA (0.9pf)</span>
                     </div>
                   </div>
 
@@ -1486,13 +1491,13 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                                   : 'bg-slate-900 text-slate-400 border border-slate-800'
                               }`}
                             >
-                              {fc.predicted_loading_pct.toFixed(0)}%
+                              {fmtNum(fc.predicted_loading_pct, 0)}%
                             </span>
                           </div>
-                          <div className="text-sm font-bold text-white">{fc.predicted_load_kw.toFixed(1)} kW</div>
+                          <div className="text-sm font-bold text-white">{fmtNum(fc.predicted_load_kw, 1)} kW</div>
                           <div className="text-[9px] text-slate-400 flex justify-between mt-1">
-                            <span>P10: {fc.confidence_p10_kw.toFixed(0)}k</span>
-                            <span>P90: {fc.confidence_p90_kw.toFixed(0)}k</span>
+                            <span>P10: {fmtNum(fc.confidence_p10_kw, 0)}k</span>
+                            <span>P90: {fmtNum(fc.confidence_p90_kw, 0)}k</span>
                           </div>
                           {fc.is_ag_shift_active && (
                             <span className="inline-block mt-1 text-[8px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-1 py-0.2 rounded">
@@ -1549,7 +1554,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
 
                           {/* Y-Axis Labels */}
                           <text x={forecastChartData.padL - 6} y={forecastChartData.padT + 8} fill="#94a3b8" textAnchor="end">
-                            {forecastChartData.maxVal.toFixed(0)}k
+                            {fmtNum(forecastChartData.maxVal, 0)}k
                           </text>
                           <text
                             x={forecastChartData.padL - 6}
@@ -1557,7 +1562,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                             fill="#64748b"
                             textAnchor="end"
                           >
-                            {(forecastChartData.maxVal * 0.5).toFixed(0)}k
+                            {fmtNum(forecastChartData.maxVal * 0.5, 0)}k
                           </text>
                           <text
                             x={forecastChartData.padL - 6}
@@ -1588,7 +1593,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                                 fontSize="8"
                                 fontWeight="bold"
                               >
-                                Rated: {forecastChartData.ratedKw.toFixed(0)} kW
+                                Rated: {fmtNum(forecastChartData.ratedKw, 0)} kW
                               </text>
                             </>
                           )}
@@ -1657,14 +1662,14 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                           <div className="flex justify-between items-center text-purple-300 font-bold border-b border-purple-900/50 pb-1 mb-1">
                             <span>Horizon {forecastChartData.pts[hoveredForecastIdx].label} Snapshot</span>
                             <span className="text-white font-bold">
-                              {forecastChartData.pts[hoveredForecastIdx].p50.toFixed(1)} kW
+                              {fmtNum(forecastChartData.pts[hoveredForecastIdx].p50, 1)} kW
                             </span>
                           </div>
                           <div className="flex justify-between text-slate-300 text-[10px]">
-                            <span>P10: {forecastChartData.pts[hoveredForecastIdx].p10.toFixed(1)} kW</span>
-                            <span>P90: {forecastChartData.pts[hoveredForecastIdx].p90.toFixed(1)} kW</span>
+                            <span>P10: {fmtNum(forecastChartData.pts[hoveredForecastIdx].p10, 1)} kW</span>
+                            <span>P90: {fmtNum(forecastChartData.pts[hoveredForecastIdx].p90, 1)} kW</span>
                             <span className="text-purple-400">
-                              Spread: ±{((forecastChartData.pts[hoveredForecastIdx].p90 - forecastChartData.pts[hoveredForecastIdx].p10) * 0.5).toFixed(1)} kW
+                              Spread: ±{fmtNum((forecastChartData.pts[hoveredForecastIdx].p90 - forecastChartData.pts[hoveredForecastIdx].p10) * 0.5, 1)} kW
                             </span>
                           </div>
                         </div>
@@ -1728,7 +1733,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                                   ? 'Rolling 3h Baseline Demand'
                                   : feat.replace('_', ' ')}
                               </span>
-                              <span className="text-purple-300 font-bold">{(score * 100).toFixed(1)}%</span>
+                              <span className="text-purple-300 font-bold">{fmtNum(score * 100, 1)}%</span>
                             </div>
                             <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
                               <div
@@ -1788,22 +1793,22 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   <div className="flex justify-between py-1 border-b border-cyan-900/40">
                     <span className="text-slate-400">Current Flow:</span>
                     <span className="text-cyan-300 font-semibold">
-                      {(props.physics_result.current_ka * 1000).toFixed(1)} A
+                      {fmtNum(props.physics_result.current_ka * 1000, 1)} A
                     </span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-cyan-900/40">
                     <span className="text-slate-400">Derated Ampacity:</span>
-                    <span className="text-slate-300">{(props.physics_result.max_i_ka * 1000).toFixed(1)} A</span>
+                    <span className="text-slate-300">{fmtNum(props.physics_result.max_i_ka * 1000, 1)} A</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-cyan-900/40">
                     <span className="text-slate-400">Active Technical Loss:</span>
                     <span className="text-amber-400 font-bold">
-                      {props.physics_result.active_loss_kw.toFixed(3)} kW
+                      {fmtNum(props.physics_result.active_loss_kw, 3)} kW
                     </span>
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-slate-400">Reactive Loss:</span>
-                    <span className="text-slate-300">{props.physics_result.reactive_loss_kvar.toFixed(3)} kVAr</span>
+                    <span className="text-slate-300">{fmtNum(props.physics_result.reactive_loss_kvar, 3)} kVAr</span>
                   </div>
                 </div>
               )}
@@ -1827,7 +1832,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-800/60">
                   <span className="text-slate-400">Current Rating:</span>
-                  <span className="text-slate-200">{((props.max_i_ka || 0.134) * 1000).toFixed(0)} A</span>
+                  <span className="text-slate-200">{fmtNum((props.max_i_ka || 0.134) * 1000, 0)} A</span>
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-slate-400">Operational:</span>
