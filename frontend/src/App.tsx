@@ -28,7 +28,7 @@ export const App: React.FC = () => {
     if (tabParam && ['overview', 'map', 'switching', 'capex', 'scenarios'].includes(tabParam)) {
       return tabParam as any;
     }
-    return 'capex'; // Default to capex for Milestone 9 demonstration
+    return 'map'; // Default to map (Network Digital Twin)
   });
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 

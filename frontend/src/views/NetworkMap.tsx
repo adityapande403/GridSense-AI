@@ -463,6 +463,33 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         setData(resData);
         setLoading(false);
         handleRunPowerFlow(1.0, 35.0);
+
+        // Auto-select DTR from URL if specified (e.g. ?dtr=DT-2011951-001)
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const targetDtrCode = urlParams.get('dtr');
+          if (targetDtrCode && resData.transformers?.features) {
+            const dtrFeat = resData.transformers.features.find((f: any) => f.properties.code === targetDtrCode);
+            if (dtrFeat) {
+              const coords = dtrFeat.geometry?.coordinates;
+              const dtrAsset: SelectedAsset = {
+                id: dtrFeat.properties.id,
+                code: dtrFeat.properties.code,
+                name: dtrFeat.properties.name,
+                entity_type: 'distribution_transformer',
+                provenance: dtrFeat.properties.provenance,
+                confidence_score: dtrFeat.properties.confidence_score,
+                properties: {
+                  ...dtrFeat.properties,
+                  coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
+                },
+              };
+              setSelectedAsset(dtrAsset);
+            }
+          }
+        } catch (e) {
+          console.warn('URL dtr param parse failed:', e);
+        }
       })
       .catch((err) => {
         console.error('Error fetching network geojson:', err);

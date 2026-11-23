@@ -82,6 +82,7 @@ def run_flisr_simulation(
         G.add_edge(str(l.from_bus_id), str(l.to_bus_id), code=l.code, type="line", is_ht=is_ht_line(l))
 
     switch_by_pair: Dict[Tuple[str, str], Switch] = {}
+    
     for sw in switches:
         if sw.current_status == 'closed' and not sw.is_normally_open:
             f_id = str(sw.from_bus_id)
