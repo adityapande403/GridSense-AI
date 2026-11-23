@@ -26,6 +26,7 @@ interface DTRClusterZoomWindowProps {
   clusterAsset?: SelectedAsset | null;
   networkData: any;
   baseMap: 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
+  mode?: 'floating' | 'embedded';
   isDrawerOpen?: boolean;
   showHTLines?: boolean;
   showLTLines?: boolean;
@@ -44,6 +45,7 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   clusterAsset,
   networkData,
   baseMap,
+  mode = 'embedded',
   isDrawerOpen = true,
   showHTLines = true,
   showLTLines = true,
@@ -1047,18 +1049,22 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
   const totalClusterPoles = stdPolesCount + dpCount;
   const entityColors = getEntityColors();
 
-  return (
-    <div
-      className={`fixed ${
-        isExpanded
-          ? 'inset-6 z-[2500]'
-          : isDrawerOpen
+  const isEmbedded = mode === 'embedded';
+
+  const containerClasses = isExpanded
+    ? 'fixed inset-6 z-[2500] bg-slate-900/98 border border-slate-700 rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in duration-200'
+    : isEmbedded
+    ? `w-full bg-slate-950/90 border ${entityColors.border} rounded-2xl shadow-xl overflow-hidden flex flex-col my-2 transition-all duration-300`
+    : `fixed ${
+        isDrawerOpen
           ? 'bottom-4 right-[580px] w-[530px] h-[430px] z-[1500]'
           : 'bottom-4 right-4 w-[530px] h-[430px] z-[1500]'
       } bg-slate-900/98 border ${
         entityColors.border
-      } rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`}
-    >
+      } rounded-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 transition-all`;
+
+  return (
+    <div className={containerClasses}>
       {/* Header Bar */}
       <div className="px-3 py-2 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2 min-w-0 flex-1 mr-2">
@@ -1251,8 +1257,10 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
 
       {/* Interactive High-Res Mini-Map Canvas */}
       <div
-        className="flex-1 relative w-full h-full transition-colors duration-200"
+        className={`${isExpanded || !isEmbedded ? 'flex-1' : ''} relative w-full transition-colors duration-200`}
         style={{
+          height: isExpanded ? 'calc(100vh - 160px)' : isEmbedded ? '240px' : '100%',
+          minHeight: isEmbedded && !isExpanded ? '240px' : undefined,
           background:
             baseMap === 'carto-voyager' || baseMap === 'osm'
               ? '#e2e8f0'

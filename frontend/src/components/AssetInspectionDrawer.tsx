@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
+import { DTRClusterZoomWindow } from './DTRClusterZoomWindow';
 
 export const fmtNum = (val: number | null | undefined, digits = 1, fallback = 'N/A'): string => {
   if (val === null || val === undefined || isNaN(Number(val))) return fallback;
@@ -152,6 +153,9 @@ interface DTRForecastReport {
 export interface AssetInspectionDrawerProps {
   asset: SelectedAsset | null;
   onClose: () => void;
+  networkData?: any;
+  baseMap?: 'carto-voyager' | 'carto-dark' | 'osm' | 'satellite';
+  onSelectAsset?: (asset: SelectedAsset) => void;
   onOpenClusterZoom?: () => void;
   isClusterZoomOpen?: boolean;
 }
@@ -159,10 +163,22 @@ export interface AssetInspectionDrawerProps {
 export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
   asset,
   onClose,
+  networkData,
+  baseMap,
+  onSelectAsset,
   onOpenClusterZoom,
   isClusterZoomOpen,
 }) => {
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
+  const [internalZoomOpen, setInternalZoomOpen] = useState<boolean>(true);
+  const isZoomActive = isClusterZoomOpen !== undefined ? isClusterZoomOpen : internalZoomOpen;
+  const toggleZoom = () => {
+    if (onOpenClusterZoom) {
+      onOpenClusterZoom();
+    } else {
+      setInternalZoomOpen((prev) => !prev);
+    }
+  };
   const [dtrTab, setDtrTab] = useState<'overview' | 'estimation' | 'thermal' | 'forecast'>(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('dtr_tab');
@@ -587,12 +603,12 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           </div>
 
           <div className="flex items-center space-x-1.5">
-            {onOpenClusterZoom && (
+            {networkData && (
               <button
-                onClick={onOpenClusterZoom}
-                title={isClusterZoomOpen ? 'Magnifier window active' : 'Reopen 22x High-Resolution Magnifier'}
+                onClick={toggleZoom}
+                title={isZoomActive ? 'Hide micro-topology magnifier' : 'Show 22x micro-topology magnifier'}
                 className={`px-2 py-1 rounded-lg border transition-colors flex items-center space-x-1 text-[11px] font-mono font-bold ${
-                  isClusterZoomOpen
+                  isZoomActive
                     ? 'text-amber-300 bg-amber-950/80 border-amber-500'
                     : 'text-slate-400 hover:text-amber-300 bg-slate-900 border-slate-700 hover:border-amber-600'
                 }`}
@@ -687,6 +703,20 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           {/* DTR TAB 1: SPECS & OVERVIEW */}
           {isDtr && dtrTab === 'overview' && (
             <div className="space-y-4">
+              {/* Seamless Embedded 22x Micro-Topology Magnifier */}
+              {isZoomActive && networkData && (
+                <DTRClusterZoomWindow
+                  mode="embedded"
+                  isOpen={isZoomActive}
+                  onClose={toggleZoom}
+                  clusterAsset={asset}
+                  dtr={asset}
+                  networkData={networkData}
+                  baseMap={baseMap || 'carto-voyager'}
+                  selectedAsset={asset}
+                  onSelectAsset={onSelectAsset}
+                />
+              )}
               <div
                 className={`p-4 rounded-xl border ${
                   (props.loading_pct || 75.0) > 100
@@ -1773,6 +1803,19 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           {/* Line Specific Metrics */}
           {asset.entity_type === 'line' && (
             <div className="space-y-4">
+              {/* Seamless Embedded 22x Micro-Topology Magnifier */}
+              {isZoomActive && networkData && (
+                <DTRClusterZoomWindow
+                  mode="embedded"
+                  isOpen={isZoomActive}
+                  onClose={toggleZoom}
+                  clusterAsset={asset}
+                  networkData={networkData}
+                  baseMap={baseMap || 'carto-voyager'}
+                  selectedAsset={asset}
+                  onSelectAsset={onSelectAsset}
+                />
+              )}
               {props.physics_result && (
                 <div className="bg-cyan-950/40 border border-cyan-800/60 rounded-xl p-4 space-y-2 font-mono text-xs shadow-lg">
                   <div className="flex items-center justify-between pb-2 border-b border-cyan-800/40">
@@ -1854,6 +1897,19 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           {/* Switch Specific Metrics */}
           {asset.entity_type === 'switch' && (
             <div className="space-y-4">
+              {/* Seamless Embedded 22x Micro-Topology Magnifier */}
+              {isZoomActive && networkData && (
+                <DTRClusterZoomWindow
+                  mode="embedded"
+                  isOpen={isZoomActive}
+                  onClose={toggleZoom}
+                  clusterAsset={asset}
+                  networkData={networkData}
+                  baseMap={baseMap || 'carto-voyager'}
+                  selectedAsset={asset}
+                  onSelectAsset={onSelectAsset}
+                />
+              )}
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
                 <div className="flex justify-between py-1 border-b border-slate-800/60">
                   <span className="text-slate-400">Type:</span>
@@ -1892,6 +1948,19 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           {/* Pole or DP Structure Specific Metrics */}
           {asset.entity_type === 'pole' && (
             <div className="space-y-4">
+              {/* Seamless Embedded 22x Micro-Topology Magnifier */}
+              {isZoomActive && networkData && (
+                <DTRClusterZoomWindow
+                  mode="embedded"
+                  isOpen={isZoomActive}
+                  onClose={toggleZoom}
+                  clusterAsset={asset}
+                  networkData={networkData}
+                  baseMap={baseMap || 'carto-voyager'}
+                  selectedAsset={asset}
+                  onSelectAsset={onSelectAsset}
+                />
+              )}
               {props.is_dp_structure || (props.name && props.name.includes('DP')) ? (
                 <div className="space-y-3">
                   <div className="bg-orange-950/40 border border-orange-700/60 rounded-xl p-3.5 space-y-1">
@@ -1951,6 +2020,44 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Substation Specific Metrics */}
+          {asset.entity_type === 'substation' && (
+            <div className="space-y-4">
+              {/* Seamless Embedded 22x Micro-Topology Magnifier */}
+              {isZoomActive && networkData && (
+                <DTRClusterZoomWindow
+                  mode="embedded"
+                  isOpen={isZoomActive}
+                  onClose={toggleZoom}
+                  clusterAsset={asset}
+                  networkData={networkData}
+                  baseMap={baseMap || 'carto-voyager'}
+                  selectedAsset={asset}
+                  onSelectAsset={onSelectAsset}
+                />
+              )}
+
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Substation Code:</span>
+                  <span className="text-purple-300 font-bold">{props.code}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">PTR Capacity:</span>
+                  <span className="text-white font-bold">{props.ptr_capacity_mva || 10} MVA</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Voltage Level:</span>
+                  <span className="text-cyan-300">{props.nominal_kv || 33} kV Primary / 11 kV Bus</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400">Outgoing Feeders:</span>
+                  <span className="text-emerald-400 font-semibold">{props.feeder_count || 3} Circuits</span>
+                </div>
+              </div>
             </div>
           )}
 
