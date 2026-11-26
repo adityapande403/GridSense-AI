@@ -3,6 +3,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from backend.src.models.network import Feeder, DistributionTransformer, Bus
+from backend.src.modules.estimation.allocator import get_dtr_operating_loading_pct
 from backend.src.modules.capex.schemas import (
     DTROptionEvaluation,
     DTRInvestmentCandidate,
@@ -64,27 +65,22 @@ def evaluate_dtr_investments(
 
         # Estimate consumer count and peak load
         consumer_count = int(rated_kva * 4.2)
-        # Simulate loading based on rating
-        # DT-2011951-001 (Beach 2) or legacy DTR-15/DTR-19 simulate peak stress
-        dtr_suffix = (dtr.code or "").split("-")[-1]
-        if dtr_suffix == "001" or any(k in (dtr.code or "") for k in ["DTR_01", "DTR_03", "DTR-15", "DTR-19"]):
-            peak_kva = rated_kva * 1.08  # 108% peak loading
-            loading_pct = 108.0
+        canonical_loading = get_dtr_operating_loading_pct(dtr.code)
+        loading_pct = canonical_loading
+        peak_kva = (loading_pct / 100.0) * rated_kva
+
+        if loading_pct > 100.0:
             tail_v = 0.925
-            health_idx = 48.0
+            health_idx = 81.0  # In direct alignment with IEC 60076-7 thermal report
             urgency = "HIGH"
             overloaded_count += 1
-        elif dtr_suffix == "003" or any(k in (dtr.code or "") for k in ["DTR-18"]):
-            peak_kva = rated_kva * 0.88  # 88% elevated loading
-            loading_pct = 88.0
+        elif loading_pct >= 85.0:
             tail_v = 0.948
-            health_idx = 72.0
+            health_idx = 88.0
             urgency = "MEDIUM"
         else:
-            peak_kva = rated_kva * 0.74  # 74% normal
-            loading_pct = 74.0
             tail_v = 0.962
-            health_idx = 85.0
+            health_idx = 95.0
             urgency = "MONITOR"
 
         aug_data = STANDARD_AUGMENTATION_RATES.get(rated_kva, {"new_kva": rated_kva * 1.6, "cost_inr": 200000.0, "weeks": 3})

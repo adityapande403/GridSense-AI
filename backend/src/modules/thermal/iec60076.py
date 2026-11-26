@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from backend.src.models.network import DistributionTransformer
+from backend.src.modules.network.context import get_feeder_grid_context
 from backend.src.modules.thermal.schemas import (
     DTRThermalInterval,
     DTRThermalReport,
@@ -87,9 +88,19 @@ def simulate_iec60076_thermal_dynamics(
     overload_hours = 0
     critical_hot_spot_hours = 0
 
+    # Calibrate ambient diurnal base and swing to regional climate profile
+    ctx = get_feeder_grid_context(db_session, feeder_code)
+    if base_ambient_temp_c is None or base_ambient_temp_c == 35.0:
+        effective_base_ambient = (ctx.diurnal_profile.ambient_min_c + ctx.diurnal_profile.ambient_max_c) / 2.0
+        effective_swing = ctx.diurnal_profile.ambient_swing_c
+    else:
+        effective_base_ambient = base_ambient_temp_c
+        effective_swing = 4.2
+
     step_idx = 0
     for hour in range(24):
-        ambient_t = get_telangana_ambient_temp(hour, base_ambient_c=base_ambient_temp_c)
+        angle = (hour - 9) * (2.0 * math.pi / 24.0)
+        ambient_t = round(effective_base_ambient + effective_swing * math.sin(angle), 1)
         if ambient_t > peak_ambient:
             peak_ambient = ambient_t
 
@@ -162,12 +173,16 @@ def simulate_iec60076_thermal_dynamics(
     penalties += 3.5 * overload_hours
     penalties += 6.0 * critical_hot_spot_hours
     penalties += 0.8 * max(0.0, total_life_consumed_hours - 24.0)
+    if peak_hot_spot > 98.0:
+        penalties += 0.8 * (peak_hot_spot - 98.0)
     if peak_hot_spot > 115.0:
         penalties += 0.6 * (peak_hot_spot - 115.0)
 
     health_index = max(10.0, min(100.0, 100.0 - penalties))
 
-    if health_index >= 85.0:
+    if overload_hours > 0 or peak_hot_spot > 98.0:
+        category = "DEGRADED (OVERLOADED)" if health_index < 70.0 else "WARNING (THERMAL STRESS)"
+    elif health_index >= 85.0:
         category = "EXCELLENT"
     elif health_index >= 70.0:
         category = "GOOD"

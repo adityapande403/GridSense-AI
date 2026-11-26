@@ -26,6 +26,7 @@ from backend.src.modules.ingest.schemas import (
     RejectionReason,
     ValidationReport,
 )
+from backend.src.modules.network.context import detect_grid_region
 from shapely.geometry import Point
 from sqlalchemy.orm import Session
 
@@ -173,39 +174,7 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
             source if not isinstance(source, dict) else source.get("path", "")
         )
 
-        # 1. Ensure Organisation exists
-        org = None
-        if organisation_id:
-            org = db_session.get(Organisation, organisation_id)
-        if not org:
-            org = db_session.query(Organisation).filter_by(code="KSEB_CENTRAL").first()
-            if not org:
-                org = Organisation(
-                    code="KSEB_CENTRAL",
-                    name="Kerala State Electricity Board (Ingested GIS)",
-                    description="Real-world distribution network imported from FileGDB.",
-                )
-                db_session.add(org)
-                db_session.flush()
-
-        # 2. Ensure Substation exists
-        substation = db_session.query(Substation).filter_by(code="SS_PUTHIYA_KADAVU").first()
-        if not substation:
-            substation = Substation(
-                organisation_id=org.id,
-                code="SS_PUTHIYA_KADAVU",
-                name="Puthiya Kadavu 33/11 kV Substation",
-                nominal_kv=33.0,
-                ptr_capacity_mva=5.0,
-                geom=Point(75.76487, 11.27276),
-                source=f"FileGDB:{gdb_path.name}",
-                provenance="assumed",
-                confidence_score=0.90,
-            )
-            db_session.add(substation)
-            db_session.flush()
-
-        # 3. Read layers
+        # 1. Read layers from FileGDB
         available_layers = {lyr[0] for lyr in pyogrio.list_layers(str(gdb_path))}
         ht_lines_gdf = (
             gpd.read_file(str(gdb_path), layer="ht_line") if "ht_line" in available_layers else None
@@ -244,6 +213,86 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
             else None
         )
 
+        # 2. Extract geographic centroid and layer attributes to detect DISCOM and region dynamically
+        centroid_lat: Optional[float] = None
+        centroid_lon: Optional[float] = None
+        for gdf in [poles_gdf, dtr_gdf, ht_lines_gdf]:
+            if gdf is not None and not gdf.empty:
+                try:
+                    tb = gdf.total_bounds
+                    if len(tb) == 4 and -180.0 <= tb[0] <= 180.0 and -90.0 <= tb[1] <= 90.0:
+                        centroid_lon = float((tb[0] + tb[2]) / 2.0)
+                        centroid_lat = float((tb[1] + tb[3]) / 2.0)
+                        break
+                except Exception:
+                    pass
+
+        feeder_code = gdb_path.stem
+        feeder_name = gdb_path.stem
+        district_hint = ""
+        town_hint = ""
+        substation_hint = ""
+
+        if dtr_gdf is not None and not dtr_gdf.empty:
+            row0 = dtr_gdf.iloc[0]
+            fc = row0.get("feeder_code")
+            fn = row0.get("feeder_name")
+            if fc and str(fc) != "NA" and str(fc).strip():
+                feeder_code = str(fc).strip()
+            if fn and str(fn) != "NA" and str(fn).strip():
+                feeder_name = str(fn).strip()
+            district_hint = str(row0.get("district") or "").strip()
+            town_hint = str(row0.get("town") or "").strip()
+            substation_hint = str(row0.get("substation_name") or "").strip()
+
+        hint_text = f"{gdb_path.name} {feeder_name} {feeder_code} {district_hint} {town_hint} {substation_hint}"
+        detected = detect_grid_region(latitude=centroid_lat, longitude=centroid_lon, hint_text=hint_text)
+
+        # 3. Dynamically resolve or create Organisation
+        org = None
+        if organisation_id:
+            org = db_session.get(Organisation, organisation_id)
+        if not org:
+            org_code = f"{detected['utility_short']}_CENTRAL"
+            org = db_session.query(Organisation).filter_by(code=org_code).first()
+            if not org:
+                # Also check legacy KSEB_CENTRAL if detected is KSEB
+                if detected["utility_short"] == "KSEB":
+                    org = db_session.query(Organisation).filter_by(code="KSEB_CENTRAL").first()
+            if not org:
+                org = Organisation(
+                    code=org_code,
+                    name=f"{detected['utility_name']} (Ingested GIS)",
+                    description=f"Real-world distribution network imported from {gdb_path.name} for {detected['state']}.",
+                )
+                db_session.add(org)
+                db_session.flush()
+
+        # 4. Dynamically resolve or create Substation
+        sub_code = f"SS_{feeder_code}"
+        sub_name = substation_hint if (substation_hint and substation_hint != "NA") else f"{feeder_name} 33/11 kV Substation"
+        substation = db_session.query(Substation).filter_by(code=sub_code).first()
+        if not substation and detected["utility_short"] == "KSEB":
+            # Check existing SS_PUTHIYA_KADAVU for backward compatibility
+            substation = db_session.query(Substation).filter_by(code="SS_PUTHIYA_KADAVU").first()
+
+        if not substation:
+            sub_lat = centroid_lat if centroid_lat is not None else (11.27276 if detected["utility_short"] == "KSEB" else 17.3850)
+            sub_lon = centroid_lon if centroid_lon is not None else (75.76487 if detected["utility_short"] == "KSEB" else 78.4867)
+            substation = Substation(
+                organisation_id=org.id,
+                code=sub_code,
+                name=sub_name,
+                nominal_kv=33.0,
+                ptr_capacity_mva=5.0,
+                geom=Point(sub_lon, sub_lat),
+                source=f"FileGDB:{gdb_path.name}",
+                provenance="assumed",
+                confidence_score=0.90,
+            )
+            db_session.add(substation)
+            db_session.flush()
+
         # Build pole coordinate index and pre-seed all physical poles
         pole_coords: Dict[str, Tuple[float, float]] = {}
         if poles_gdf is not None:
@@ -258,17 +307,7 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
                     if alt1: pole_coords[alt1] = (pgeom.x, pgeom.y)
                     if alt2: pole_coords[alt2] = (pgeom.x, pgeom.y)
 
-        # 4. Resolve Feeder
-        feeder_code = "2011951"
-        feeder_name = "Puthiya Kadavu"
-        if dtr_gdf is not None and not dtr_gdf.empty:
-            fc = dtr_gdf.iloc[0].get("feeder_code")
-            fn = dtr_gdf.iloc[0].get("feeder_name")
-            if fc and str(fc) != "NA":
-                feeder_code = str(fc)
-            if fn and str(fn) != "NA":
-                feeder_name = str(fn)
-
+        # 5. Dynamically resolve or create Feeder
         feeder = db_session.query(Feeder).filter_by(code=feeder_code).first()
         if not feeder:
             feeder = Feeder(
@@ -278,7 +317,15 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
                 voltage_kv=11.0,
                 peak_load_kw=1100.0,
                 trunk_conductor_type="ACSR_Rabbit",
-                metadata_json={"source_gdb": gdb_path.name},
+                metadata_json={
+                    "source_gdb": gdb_path.name,
+                    "state": detected["state"],
+                    "utility_short": detected["utility_short"],
+                    "regulatory_body": detected["regulatory_body"],
+                    "regulatory_band": detected["regulatory_band"],
+                    "district": district_hint or ("Kozhikode" if detected["utility_short"] == "KSEB" else "Rangareddy"),
+                    "town": town_hint or ("KOZHIKODE" if detected["utility_short"] == "KSEB" else "HYDERABAD"),
+                },
                 source=f"FileGDB:{gdb_path.name}",
                 provenance="measured",
                 confidence_score=0.95,
@@ -349,7 +396,7 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
                 feeder_id=feeder.id,
                 code=clean_code,
                 name=f"Pole/Bus {clean_code}",
-                voltage_level_kv=11.0 if is_substation_source or "PL-2011951" in clean_code else 0.415,
+                voltage_level_kv=11.0 if is_substation_source or (feeder_code and feeder_code in clean_code) or clean_code.startswith("PL-") or clean_code.startswith("HT-") or clean_code.startswith("HC-") or clean_code.startswith("HL-") else 0.415,
                 bus_type=bus_type,
                 geom=pt,
                 source=f"FileGDB:{gdb_path.name}",

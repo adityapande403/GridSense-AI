@@ -1,4 +1,5 @@
 import math
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -7,7 +8,9 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from backend.src.models.network import DistributionTransformer, Substation
+from backend.src.models.network import DistributionTransformer, Substation, Switch, Bus, Feeder
+from backend.src.modules.estimation.allocator import get_dtr_operating_loading_pct
+from backend.src.modules.network.context import get_feeder_grid_context
 from backend.src.modules.forecast.schemas import (
     DTRForecastReport,
     FeederForecastAlertsSummary,
@@ -38,9 +41,10 @@ def _generate_synthetic_historical_telemetry(
     start_time = datetime.now(timezone.utc) - timedelta(days=days)
     
     rated_kw = dtr.rated_kva * 0.9
-    loading_pct = getattr(dtr, 'loading_pct', 94.0 if any(k in dtr.code for k in ['001', '002', '03', '15']) else 68.0)
+    canonical_pct = get_dtr_operating_loading_pct(dtr.code)
+    loading_pct = getattr(dtr, 'loading_pct', None) or canonical_pct
     is_stressed = loading_pct > 80.0
-    stress_multiplier = 1.15 if is_stressed else 0.78
+    stress_multiplier = (loading_pct / 100.0) / 0.85 if is_stressed else 0.78
     
     records = []
     
@@ -369,7 +373,8 @@ def build_dtr_forecast_report(
     forecasts = forecaster.generate_rolling_forecasts()
     
     rated_kw = dtr.rated_kva * 0.9
-    loading_pct = getattr(dtr, 'loading_pct', 94.0 if any(k in dtr.code for k in ['001', '002', '03', '15']) else 68.0)
+    canonical_pct = get_dtr_operating_loading_pct(dtr.code)
+    loading_pct = getattr(dtr, 'loading_pct', None) or canonical_pct
     current_load_kw = (loading_pct / 100.0) * rated_kw
     
     return DTRForecastReport(
@@ -407,14 +412,37 @@ def generate_feeder_overload_alerts(
     if not dtrs:
         dtrs = all_dtrs[:20]
         
+    # Retrieve dynamic regional grid context
+    ctx = get_feeder_grid_context(db_session, feeder_code)
+    feeder = db_session.query(Feeder).filter(Feeder.code == str(feeder_code)).first()
+    if not feeder:
+        try:
+            f_uuid = uuid.UUID(str(feeder_code))
+            feeder = db_session.query(Feeder).filter(Feeder.id == f_uuid).first()
+        except (ValueError, TypeError):
+            feeder = None
+    feeder_display_name = f"{ctx.feeder_name} ({ctx.feeder_code})"
+    primary_driver_desc = f"{ctx.diurnal_profile.overload_driver_template} (θ_a > {round(ctx.diurnal_profile.ambient_max_c - 1.5, 1)}°C)"
+
+    # Find candidate switches or tie-switches on this feeder dynamically
+    feeder_switches = (
+        db_session.query(Switch)
+        .join(Bus, (Switch.from_bus_id == Bus.id) | (Switch.to_bus_id == Bus.id))
+        .filter(Bus.feeder_id == feeder.id)
+        .all()
+    ) if feeder else []
+    tie_sw = next((s for s in feeder_switches if s.is_normally_open or "TIE" in (s.code or "").upper()), None)
+    target_switch_desc = tie_sw.code if tie_sw else (feeder_switches[0].code if feeder_switches else "feeder tie switch")
+
     alerts = []
     
     for dtr in dtrs:
         rated_kw = dtr.rated_kva * 0.9
-        dtr_loading = getattr(dtr, 'loading_pct', 94.0 if any(k in dtr.code for k in ['001', '002', '03', '15']) else 68.0)
+        canonical_pct = get_dtr_operating_loading_pct(dtr.code)
+        dtr_loading = getattr(dtr, 'loading_pct', None) or canonical_pct
         
         # Determine if transformer exhibits peak stress
-        if dtr_loading >= 85.0 or (dtr.code in ["DT-2011951-001", "DT-2011951-002", "DTR_FDR_042_01_03"]):
+        if dtr_loading >= 80.0:
             # Trigger early warning alert with realistic advance lead time (4h or 8h)
             lead_time = 4 if dtr_loading >= 95.0 else 8
             target_dt = datetime.now(timezone.utc) + timedelta(hours=lead_time)
@@ -423,14 +451,11 @@ def generate_feeder_overload_alerts(
             projected_peak_kw = (projected_loading / 100.0) * rated_kw
             severity = "CRITICAL" if projected_loading > 100.0 else "WARNING"
             
-            driver = (
-                "KSEB Coastal Evening Lighting & Cooling Peak (18:00-22:00) + "
-                "Harbour Cold Storage Demand (θ_a > 32°C)"
-            )
+            driver = primary_driver_desc
             
             mitigation = (
                 f"Execute FLISR load transfer: transfer {round(projected_peak_kw * 0.28, 1)} kW "
-                f"to adjacent network via tie-switch TIE_PL-660118-B-014 or SWIT_RM-2011951-001_C1 (RMU), reducing DTR loading to {round(projected_loading * 0.72, 1)}%."
+                f"to adjacent network via tie-switch {target_switch_desc}, reducing DTR loading to {round(projected_loading * 0.72, 1)}%."
             )
             
             alerts.append(
@@ -460,7 +485,7 @@ def generate_feeder_overload_alerts(
     
     return FeederForecastAlertsSummary(
         feeder_code=feeder_code,
-        feeder_name="Puthiya Kadavu Feeder (2011951)",
+        feeder_name=feeder_display_name,
         total_dtrs_monitored=len(dtrs),
         active_alerts_count=len(alerts),
         critical_alerts_count=crit_count,

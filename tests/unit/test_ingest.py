@@ -190,7 +190,7 @@ def test_geojson_adapter_ingest_roundtrip(db_session):
     assert result.created_counts["lines"] == 1
     assert result.created_counts["distribution_transformers"] == 1
     assert result.created_counts["consumers"] == 1
-    assert result.created_counts["connections"] == 2
+    assert result.created_counts["connections"] == 3  # 2 for line terminals + 1 for DTR primary
 
 
 def test_csv_adapter_validation_and_ingest(db_session):

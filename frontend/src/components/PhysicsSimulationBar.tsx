@@ -12,6 +12,7 @@ import {
   X,
   BookOpen,
 } from 'lucide-react';
+import { useGridContext } from '../context/GridContext';
 
 export interface PowerFlowSummaryData {
   feeder_code: string;
@@ -73,6 +74,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
   isLayersCollapsed = false,
   className,
 }) => {
+  const { gridContext } = useGridContext();
   const [loadMultiplier, setLoadMultiplier] = useState<number>(1.0);
   const [ambientTempC, setAmbientTempC] = useState<number>(35.0);
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
@@ -101,7 +103,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
                     AC Newton-Raphson
                   </span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    KSERC &plusmn;6% (TR-PHY-03)
+                    {gridContext?.regulatory_band || 'SERC ±6%'} (TR-PHY-03)
                   </span>
                 </div>
               </div>
@@ -374,7 +376,7 @@ export const PhysicsSimulationBar: React.FC<PhysicsSimulationBarProps> = ({
                   The <strong>AC Newton-Raphson solver</strong> calculates:
                 </p>
                 <ul className="list-disc list-inside text-slate-300 space-y-1 font-mono text-[11px]">
-                  <li><strong>Bus Voltages (V):</strong> Checks that voltage at every pole stays within the statutory &plusmn;6.0% band (0.94 &ndash; 1.06 p.u.) per KSERC regulations.</li>
+                  <li><strong>Bus Voltages (V):</strong> Checks that voltage at every pole stays within the statutory &plusmn;6.0% band (0.94 &ndash; 1.06 p.u.) per {gridContext?.regulatory_body || 'SERC'} regulations.</li>
                   <li><strong>Conductor Currents (A):</strong> Computes the exact amperage flowing through each cable.</li>
                   <li><strong>Technical Losses (kW):</strong> Calculates energy wasted as conductor heat (I&sup2;R).</li>
                 </ul>

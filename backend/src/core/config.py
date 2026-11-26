@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # JWT Security
     SECRET_KEY: str = Field(
-        default="gridsense-super-secret-development-key-change-in-production-2026",
+        default="gridsense-dev-secret-key-change-in-production",
         validation_alias="SECRET_KEY",
     )
     ALGORITHM: str = "HS256"

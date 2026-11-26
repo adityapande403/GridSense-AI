@@ -12,6 +12,8 @@ import {
   Split
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
+import { ClickableAsset } from '../components/ClickableAsset';
+import { useGridContext } from '../context/GridContext';
 
 /* =========================================================================
    TYPE DEFINITIONS (Matching Backend CAPEX Schemas)
@@ -163,6 +165,7 @@ interface TornadoSensitivityReport {
 }
 
 export const CapexPlanner: React.FC = () => {
+  const { gridContext } = useGridContext();
   // Navigation Sub-tab
   const [activeSubTab, setActiveSubTab] = useState<'reconductoring' | 'dtr' | 'bifurcation' | 'tornado'>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -174,7 +177,7 @@ export const CapexPlanner: React.FC = () => {
   });
 
   // Shared Parameters
-  const feederCode = '2011951';
+  const feederCode = gridContext?.feeder_code || '2011951';
   const [costPerKwh, setCostPerKwh] = useState<number>(5.50);
   const [discountRate, setDiscountRate] = useState<number>(10.0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -190,7 +193,7 @@ export const CapexPlanner: React.FC = () => {
   // Fetch all CAPEX intelligence on mount or parameter change
   useEffect(() => {
     fetchAllCapexData();
-  }, [costPerKwh, discountRate]);
+  }, [costPerKwh, discountRate, feederCode]);
 
   const fetchAllCapexData = async () => {
     setIsLoading(true);
@@ -208,7 +211,7 @@ export const CapexPlanner: React.FC = () => {
             base_cost_per_kwh: costPerKwh,
             base_discount_rate_pct: discountRate,
             base_growth_rate_pct: 3.5,
-            portfolio_name: 'Puthiya Kadavu Feeder CAPEX Program',
+            portfolio_name: `${gridContext?.feeder_name || 'Active Feeder'} CAPEX Program`,
           }),
         }),
       ]);
@@ -327,14 +330,18 @@ export const CapexPlanner: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t border-slate-800/80 text-xs font-mono">
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">TARGET FEEDER</span>
-            <span className="font-bold text-white">Puthiya Kadavu</span>
+            <span className="font-bold text-white">{gridContext?.feeder_name || 'Feeder'}</span>
             <span className="text-slate-400 block text-[10px]">Code: {feederCode} (11 kV)</span>
           </div>
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">CONNECTED ASSETS</span>
-            <span className="font-bold text-cyan-400">553 Lines &bull; 4 DTRs</span>
-            <span className="text-slate-400 block text-[10px]">~2,772 Consumers</span>
+            <span className="font-bold text-cyan-400">
+              {reconductoringData?.candidates?.length || 33} HT Lines &bull; {dtrData?.dtr_evaluations?.length || 4} DTRs
+            </span>
+            <span className="text-slate-400 block text-[10px]">
+              ~{(dtrData?.dtr_evaluations?.length || 4) * 690} Consumers
+            </span>
           </div>
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg flex flex-col justify-between">
@@ -374,7 +381,7 @@ export const CapexPlanner: React.FC = () => {
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">FINANCIAL METRIC</span>
             <span className="font-bold text-purple-400">NPV + Simple Payback</span>
-            <span className="text-slate-400 block text-[10px]">KSERC Regulated</span>
+            <span className="text-slate-400 block text-[10px]">{gridContext?.regulatory_body || 'SERC'} Regulated</span>
           </div>
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg flex items-center justify-center">
@@ -498,7 +505,9 @@ export const CapexPlanner: React.FC = () => {
                           #{cand.rank}
                         </span>
                       </td>
-                      <td className="p-3 font-bold text-white">{cand.line_code}</td>
+                      <td className="p-3 font-bold text-white">
+                        <ClickableAsset code={cand.line_code} feederCode={feederCode} badge="LINE" />
+                      </td>
                       <td className="p-3 text-slate-300">{(cand.length_km * 1000).toFixed(0)} m</td>
                       <td className="p-3">
                         <span className="text-slate-400">{cand.current_conductor}</span>
@@ -574,7 +583,26 @@ export const CapexPlanner: React.FC = () => {
 
           {/* Selected DTR Telemetry Strip */}
           {selectedDtr && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono bg-slate-900 border border-slate-800 p-4 rounded-xl">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-slate-400">SELECTED ASSET:</span>
+                  <ClickableAsset
+                    code={selectedDtr.dtr_code}
+                    name={selectedDtr.dtr_name}
+                    feederCode={feederCode}
+                    badge="DTR"
+                  />
+                </div>
+                <ClickableAsset
+                  code={selectedDtr.dtr_code}
+                  feederCode={feederCode}
+                  className="bg-cyan-950/60 border border-cyan-800/80 px-2 py-0.5 rounded text-[11px]"
+                >
+                  Inspect on Digital Twin Map &rarr;
+                </ClickableAsset>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono bg-slate-900 border border-slate-800 p-4 rounded-xl">
               <div>
                 <span className="text-slate-500 block text-[10px]">CURRENT RATING</span>
                 <span className="font-bold text-white">{selectedDtr.rated_kva} kVA</span>
@@ -605,6 +633,7 @@ export const CapexPlanner: React.FC = () => {
                   {selectedDtr.recommended_option_type}
                 </span>
               </div>
+            </div>
             </div>
           )}
 
@@ -800,7 +829,7 @@ export const CapexPlanner: React.FC = () => {
 
                       <div className="text-xs text-slate-300 font-mono mt-2 space-y-0.5">
                         <div>
-                          Node: <strong className="text-cyan-300">{split.split_node_code}</strong> &bull;{' '}
+                          Node: <ClickableAsset code={split.split_node_code} feederCode={feederCode} badge="BUS" /> &bull;{' '}
                           <strong className="text-white">{split.split_node_location}</strong>
                         </div>
                         {split.coordinates && (

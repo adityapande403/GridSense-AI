@@ -19,6 +19,7 @@ import {
 import { ProvenanceBadge } from './ProvenanceBadge';
 import { CalculationModal, CalculationDetails } from './CalculationModal';
 import { DTRClusterZoomWindow } from './DTRClusterZoomWindow';
+import { useGridContext } from '../context/GridContext';
 
 export const fmtNum = (val: number | null | undefined, digits = 1, fallback = 'N/A'): string => {
   if (val === null || val === undefined || isNaN(Number(val))) return fallback;
@@ -168,6 +169,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
   onOpenClusterZoom,
   isClusterZoomOpen,
 }) => {
+  const { gridContext } = useGridContext();
   const [modalDetails, setModalDetails] = useState<CalculationDetails | null>(null);
   const [internalZoomOpen, setInternalZoomOpen] = useState<boolean>(true);
   const isZoomActive = isClusterZoomOpen !== undefined ? isClusterZoomOpen : internalZoomOpen;
@@ -290,7 +292,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
         assumptions: [
           'Top-oil rise Δθ_or = 55 K, Hot-spot rise Δθ_hr = 23 K at rated capacity.',
           'Montsinger relative aging rate doubles for every 6°C rise above 98°C reference.',
-          'KSEB coastal load cycle: Domestic evening peak (18:00-22:00) and harbour commercial shift (06:00-12:00).',
+          `${gridContext?.diurnal_profile?.overload_driver_template || 'Regional diurnal demand profile: domestic evening peak and commercial shifts'}.`,
           'Uncertainty intervals (P10/P90) reflect unmetered distribution transformer variance.',
         ],
         constraints: [
@@ -354,12 +356,12 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
         ],
         constraints: [
           'Branch current I ≤ Thermal Ampacity (I_max).',
-          'Statutory voltage drop across feeder ≤ 6.0% (KSERC).',
+          `Statutory voltage drop across feeder ≤ 6.0% (${gridContext?.regulatory_body || 'SERC'}).`,
         ],
         sourceStandards: [
           'REC Construction Standards & BIS 398 Part 2 Specification',
           'IEEE Std 738-2012 Standard for Calculating Bare Overhead Conductor Temperature and Ampacity',
-          'KSERC Distribution Code 2014 / CEA Grid Standards',
+          `${gridContext?.supply_code_standard || 'State Electricity Supply Code'} / CEA Grid Standards`,
         ],
         provenance: pf ? 'estimated' : asset.provenance,
         confidenceScore: asset.confidence_score || 0.90,
@@ -1459,7 +1461,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">Current Active</span>
                       <span className="text-sm font-bold text-white">{fmtNum(forecastReport.current_load_kw, 1)} kW</span>
-                      <span className="text-[9px] text-slate-500 block">{fmtNum(forecastReport.current_loading_pct, 0)}% Load</span>
+                      <span className="text-[9px] text-slate-500 block">{fmtNum(forecastReport.current_loading_pct, 1)}% Load</span>
                     </div>
                     <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
                       <span className="text-[10px] text-slate-400 block uppercase">24h Peak Pred</span>
@@ -1705,24 +1707,24 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                       Chronological Walk-Forward Benchmarks (LightGBM vs Persistence):
                     </span>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-[10px]">
+                      <table className="w-full text-left text-[10px] min-w-[420px]">
                         <thead>
                           <tr className="border-b border-slate-800 text-slate-400">
-                            <th className="py-1">Horizon</th>
-                            <th className="py-1">GBDT MAE</th>
-                            <th className="py-1">GBDT MAPE</th>
-                            <th className="py-1">Persistence</th>
-                            <th className="py-1 text-right">Accuracy Gain</th>
+                            <th className="py-1.5 px-2 whitespace-nowrap">Horizon</th>
+                            <th className="py-1.5 px-2 whitespace-nowrap">GBDT MAE</th>
+                            <th className="py-1.5 px-2 whitespace-nowrap">GBDT MAPE</th>
+                            <th className="py-1.5 px-2 whitespace-nowrap">Persistence</th>
+                            <th className="py-1.5 px-2 whitespace-nowrap text-right">Accuracy Gain</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">
                           {forecastReport.benchmarks.map((b) => (
                             <tr key={b.horizon_hours} className="hover:bg-slate-900/50">
-                              <td className="py-1 font-bold text-purple-400">+{b.horizon_hours}h</td>
-                              <td className="py-1 text-white">{b.model_mae_kw} kW</td>
-                              <td className="py-1 text-cyan-300">{b.model_mape_pct}%</td>
-                              <td className="py-1 text-slate-400">{b.persistence_mape_pct}%</td>
-                              <td className="py-1 text-right font-bold text-emerald-400">
+                              <td className="py-1 px-2 whitespace-nowrap font-bold text-purple-400">+{b.horizon_hours}h</td>
+                              <td className="py-1 px-2 whitespace-nowrap text-white">{b.model_mae_kw} kW</td>
+                              <td className="py-1 px-2 whitespace-nowrap text-cyan-300">{b.model_mape_pct}%</td>
+                              <td className="py-1 px-2 whitespace-nowrap text-slate-400">{b.persistence_mape_pct}%</td>
+                              <td className="py-1 px-2 whitespace-nowrap text-right font-bold text-emerald-400">
                                 +{b.improvement_over_persistence_pct}%
                               </td>
                             </tr>
@@ -1735,7 +1737,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
                   {/* Top Feature Importances (TR-FOR-04) */}
                   <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2 font-mono text-xs">
                     <span className="text-[11px] font-semibold text-slate-300 block">
-                      Top GBDT Predictive Drivers (KSEB Operations):
+                      Top GBDT Predictive Drivers ({gridContext?.utility_short || 'DISCOM'} Operations):
                     </span>
                     <div className="space-y-1.5 text-[10px]">
                       {Object.entries(forecastReport.feature_importances)

@@ -234,12 +234,24 @@ class GeoJSONIngestionAdapter(BaseIngestionAdapter):
         if feeder_id:
             feeder = db_session.get(Feeder, feeder_id)
         if not feeder:
-            feeder = db_session.query(Feeder).filter_by(code="F_GEOJSON").first()
+            # Check if features carry dynamic feeder metadata
+            dynamic_fc = None
+            dynamic_fn = None
+            for feat in features:
+                p = feat.get("properties", {})
+                if p.get("feeder_code"):
+                    dynamic_fc = str(p.get("feeder_code")).strip()
+                    dynamic_fn = str(p.get("feeder_name") or f"Feeder {dynamic_fc}").strip()
+                    break
+            target_fc = dynamic_fc or "F_GEOJSON"
+            target_fn = dynamic_fn or "GeoJSON Feeder 1"
+
+            feeder = db_session.query(Feeder).filter_by(code=target_fc).first()
             if not feeder:
                 feeder = Feeder(
                     substation_id=substation.id,
-                    code="F_GEOJSON",
-                    name="GeoJSON Feeder 1",
+                    code=target_fc,
+                    name=target_fn,
                     voltage_kv=11.0,
                     peak_load_kw=1000.0,
                     trunk_conductor_type="ACSR_Rabbit",
@@ -358,8 +370,8 @@ class GeoJSONIngestionAdapter(BaseIngestionAdapter):
                     db_session.flush()
                     created_counts["lines"] += 1
 
-                    # Connection
-                    conn = Connection(
+                    # Line Connections: Terminal 1 (from_bus) and Terminal 2 (to_bus)
+                    conn1 = Connection(
                         from_element_type="line",
                         from_element_id=line.id,
                         from_terminal="1",
@@ -371,8 +383,22 @@ class GeoJSONIngestionAdapter(BaseIngestionAdapter):
                         source="GeoJSON",
                         provenance="measured",
                     )
-                    db_session.add(conn)
-                    created_counts["connections"] += 1
+                    db_session.add(conn1)
+
+                    conn2 = Connection(
+                        from_element_type="line",
+                        from_element_id=line.id,
+                        from_terminal="2",
+                        to_element_type="bus",
+                        to_element_id=to_bus.id,
+                        to_terminal="term",
+                        is_active=True,
+                        metadata_json={"bus_code": to_bus.code},
+                        source="GeoJSON",
+                        provenance="measured",
+                    )
+                    db_session.add(conn2)
+                    created_counts["connections"] += 2
 
             elif entity_type in ("dtr", "distribution_transformer"):
                 bus_code = props.get("bus_code") or props.get("parent_bus") or f"BUS_{code_str}"
@@ -439,7 +465,38 @@ class GeoJSONIngestionAdapter(BaseIngestionAdapter):
                         confidence_score=float(props.get("confidence_score", 0.90)),
                     )
                     db_session.add(sw)
+                    db_session.flush()
                     created_counts["switches"] += 1
+
+                    # Switch Connections (from_bus and to_bus)
+                    conn_sw1 = Connection(
+                        from_element_type="switch",
+                        from_element_id=sw.id,
+                        from_terminal="from",
+                        to_element_type="bus",
+                        to_element_id=from_bus.id,
+                        to_terminal="term",
+                        is_active=True,
+                        metadata_json={"bus_code": from_bus.code},
+                        source="GeoJSON",
+                        provenance="measured",
+                    )
+                    db_session.add(conn_sw1)
+
+                    conn_sw2 = Connection(
+                        from_element_type="switch",
+                        from_element_id=sw.id,
+                        from_terminal="to",
+                        to_element_type="bus",
+                        to_element_id=to_bus.id,
+                        to_terminal="term",
+                        is_active=True,
+                        metadata_json={"bus_code": to_bus.code},
+                        source="GeoJSON",
+                        provenance="measured",
+                    )
+                    db_session.add(conn_sw2)
+                    created_counts["connections"] += 2
 
             elif entity_type == "consumer":
                 dtr_code = props.get("dtr_code") or props.get("transformer_code")

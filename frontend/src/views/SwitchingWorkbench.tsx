@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { ProvenanceBadge } from '../components/ProvenanceBadge';
+import { ClickableAsset } from '../components/ClickableAsset';
+import { useGridContext } from '../context/GridContext';
 
 /* =========================================================================
    TYPE DEFINITIONS (Matching Backend Schemas)
@@ -160,6 +162,7 @@ interface SwitchItem {
 }
 
 export const SwitchingWorkbench: React.FC = () => {
+  const { gridContext } = useGridContext();
   // Navigation Mode: 'reconfig' (TR-SWT) | 'flisr' (TR-FLI)
   const [activeMode, setActiveMode] = useState<'reconfig' | 'flisr'>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -169,7 +172,7 @@ export const SwitchingWorkbench: React.FC = () => {
   });
 
   // Shared Data
-  const feederCode = '2011951';
+  const feederCode = gridContext?.feeder_code || '2011951';
   const [switches, setSwitches] = useState<SwitchItem[]>([]);
   const [faultableLines, setFaultableLines] = useState<FaultableLine[]>([]);
 
@@ -186,12 +189,19 @@ export const SwitchingWorkbench: React.FC = () => {
   // Execution Checklist & Sign-Off State
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const [isSignOffModalOpen, setIsSignOffModalOpen] = useState<boolean>(false);
-  const [operatorId, setOperatorId] = useState<string>('ENG-KSEB-4091');
+  const [operatorId, setOperatorId] = useState<string>(() => `ENG-${gridContext?.utility_short || 'KSEB'}-4091`);
   const [operatorRole, setOperatorRole] = useState<string>('Senior Distribution Engineer');
   const [justification, setJustification] = useState<string>(
     'AC Newton-Raphson feasibility confirmed. Minimal loss reconfiguration with break-before-make interlock verified.'
   );
-  const [fieldCrew, setFieldCrew] = useState<string>('Kozhikode Puthiya Kadavu Field Crew #1');
+  const [fieldCrew, setFieldCrew] = useState<string>(() => gridContext?.field_crew_default || 'Kozhikode Puthiya Kadavu Field Crew #1');
+
+  useEffect(() => {
+    if (gridContext) {
+      if (gridContext.field_crew_default) setFieldCrew(gridContext.field_crew_default);
+      if (gridContext.utility_short) setOperatorId(`ENG-${gridContext.utility_short}-4091`);
+    }
+  }, [gridContext?.utility_short, gridContext?.field_crew_default]);
   const [isSubmittingApproval, setIsSubmittingApproval] = useState<boolean>(false);
   const [approvalResult, setApprovalResult] = useState<SwitchingApprovalResponse | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
@@ -229,7 +239,7 @@ export const SwitchingWorkbench: React.FC = () => {
     if (new URLSearchParams(window.location.search).get('mode') === 'flisr' || window.location.hash.includes('flisr')) {
       handleRunFLISR();
     }
-  }, []);
+  }, [feederCode]);
 
   // Run Switching Optimization
   const handleRunOptimization = async () => {
@@ -416,7 +426,7 @@ export const SwitchingWorkbench: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t border-slate-800/80 text-xs font-mono">
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">TARGET FEEDER</span>
-            <span className="font-bold text-white">Puthiya Kadavu</span>
+            <span className="font-bold text-white">{gridContext?.feeder_name || 'Feeder'}</span>
             <span className="text-slate-400 block text-[10px]">Code: {feederCode} (11 kV)</span>
           </div>
 
@@ -444,14 +454,18 @@ export const SwitchingWorkbench: React.FC = () => {
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">CONNECTED DTRS</span>
-            <span className="font-bold text-emerald-400">4 DTRs (660 kVA)</span>
-            <span className="text-slate-400 block text-[10px]">~2,772 Consumers</span>
+            <span className="font-bold text-emerald-400">
+              4 DTRs (660 kVA)
+            </span>
+            <span className="text-slate-400 block text-[10px]">
+              ~2,772 Consumers
+            </span>
           </div>
 
           <div className="bg-slate-950/70 border border-slate-800 p-2.5 rounded-lg">
             <span className="text-slate-500 block text-[10px]">LOSS VALUATION</span>
             <span className="font-bold text-yellow-400">₹5.50 / kWh</span>
-            <span className="text-slate-400 block text-[10px]">KSEB Bulk ACoS</span>
+            <span className="text-slate-400 block text-[10px]">{gridContext?.utility_short || 'DISCOM'} Bulk ACoS</span>
           </div>
         </div>
       </div>
@@ -841,9 +855,10 @@ export const SwitchingWorkbench: React.FC = () => {
                               >
                                 {step.action} ({isOpen ? 'BREAK' : 'MAKE'})
                               </span>
-                              <span className="text-sm font-bold text-white font-mono">
-                                Switch: {step.switch_code}
-                              </span>
+                              <div className="flex items-center gap-1.5 text-sm font-bold text-white font-mono">
+                                <span>Switch:</span>
+                                <ClickableAsset code={step.switch_code} feederCode={feederCode} badge="SWITCH" />
+                              </div>
                             </div>
 
                             <div className="text-xs text-slate-400 font-mono mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -856,7 +871,10 @@ export const SwitchingWorkbench: React.FC = () => {
                                   <span className="text-yellow-400 font-bold">Manual Field Crew</span>
                                 )}
                               </span>
-                              <span>Span: {step.from_bus_code} ➔ {step.to_bus_code}</span>
+                              <span className="flex items-center gap-1">
+                                Span: <ClickableAsset code={step.from_bus_code} feederCode={feederCode} showIcon={false} /> ➔{' '}
+                                <ClickableAsset code={step.to_bus_code} feederCode={feederCode} showIcon={false} />
+                              </span>
                             </div>
 
                             <p className="text-xs text-slate-400 mt-2 bg-slate-900/80 p-2 rounded border border-slate-800/80">
@@ -994,8 +1012,12 @@ export const SwitchingWorkbench: React.FC = () => {
                   <div className="text-lg font-bold text-white font-mono mt-1">
                     {flisrReport.isolated_zone_id}
                   </div>
-                  <div className="text-xs text-rose-200 font-mono mt-1">
-                    Bounded: {flisrReport.lines_in_isolated_zone.length} Conductor Segments
+                  <div className="text-xs text-rose-200 font-mono mt-1 space-y-1">
+                    <div>Bounded: {flisrReport.lines_in_isolated_zone.length} Conductor Segments</div>
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="text-slate-400">Faulted Line:</span>
+                      <ClickableAsset code={flisrReport.faulted_line_code} feederCode={feederCode} badge="LINE" />
+                    </div>
                   </div>
                 </div>
 
@@ -1103,9 +1125,7 @@ export const SwitchingWorkbench: React.FC = () => {
                                   <span className="text-xs font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded">
                                     OPEN
                                   </span>
-                                  <span className="text-sm font-bold text-white font-mono">
-                                    {step.switch_code}
-                                  </span>
+                                  <ClickableAsset code={step.switch_code} feederCode={feederCode} badge="SWITCH" />
                                 </div>
                                 <div className="text-xs text-slate-400 font-mono mt-1 space-y-0.5">
                                   <div>Type: {step.switch_type} &bull; {step.is_motorized ? 'Motorized SCADA' : 'Manual Crew'}</div>
@@ -1171,8 +1191,8 @@ export const SwitchingWorkbench: React.FC = () => {
                                 #{rPlan.rank}
                               </span>
                               <span className="text-sm font-bold text-white font-mono">{rPlan.restoration_id}</span>
-                              <span className="text-xs text-slate-400 font-mono">
-                                via <strong className="text-cyan-300">{rPlan.tie_switch_code}</strong>
+                              <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                                via <ClickableAsset code={rPlan.tie_switch_code} feederCode={feederCode} badge="TIE SWITCH" />
                               </span>
                             </div>
                             <StatusBadge status={rPlan.status} />
@@ -1222,7 +1242,7 @@ export const SwitchingWorkbench: React.FC = () => {
                                       )}
                                     </button>
                                     <span className="text-emerald-400 font-bold">CLOSE</span>
-                                    <span className="text-white font-bold">{step.switch_code}</span>
+                                    <ClickableAsset code={step.switch_code} feederCode={feederCode} badge="SWITCH" />
                                     <span className="text-slate-400">({step.switch_type} &bull; {step.is_motorized ? 'Motorized' : 'Manual'})</span>
                                   </div>
                                   <span className="text-slate-500 text-[10px]">
@@ -1292,20 +1312,20 @@ export const SwitchingWorkbench: React.FC = () => {
             {/* 11 kV Substation Bus (Golden Bar) */}
             <rect x="40" y="40" width="16" height="150" fill="#f59e0b" rx="2" />
             <text x="48" y="210" fill="#fbbf24" textAnchor="middle" fontSize="10" fontWeight="bold">
-              SUBSTATION 11kV BUS
+              {gridContext?.substation_name?.toUpperCase() || 'SUBSTATION'} 11kV BUS
             </text>
 
-            {/* Feeder Outgoing Breaker CB-2011951 */}
+            {/* Feeder Outgoing Breaker */}
             <line x1="56" y1="90" x2="120" y2="90" stroke="#06b6d4" strokeWidth="3" />
             <circle cx="120" cy="90" r="7" fill="#0f172a" stroke="#10b981" strokeWidth="2.5" />
             <text x="120" y="75" fill="#94a3b8" textAnchor="middle" fontSize="9">
-              CB-01 (CLOSED)
+              {`CB-${feederCode.slice(-4)}`} (CLOSED)
             </text>
 
             {/* Main HT Trunk Line 1 */}
             <line x1="127" y1="90" x2="250" y2="90" stroke="#06b6d4" strokeWidth="3" />
             <text x="180" y="82" fill="#64748b" textAnchor="middle" fontSize="9">
-              HC-2011951-002 (853m)
+              {faultableLines[0]?.code || 'Trunk Line 1'} ({faultableLines[0]?.length_km ? `${Math.round(faultableLines[0].length_km * 1000)}m` : '850m'})
             </text>
 
             {/* Sectionalizer SW-01 (RMU-1) */}
@@ -1316,21 +1336,21 @@ export const SwitchingWorkbench: React.FC = () => {
               r="8"
               fill="#0f172a"
               stroke={
-                selectedPlan?.switches_to_open.includes('SW-01') || flisrReport
+                selectedPlan?.switches_to_open.includes(switches[0]?.code || 'SW-01') || flisrReport
                   ? '#ef4444'
                   : '#10b981'
               }
               strokeWidth="3"
             />
             <text x="250" y="73" fill="#cbd5e1" textAnchor="middle" fontSize="9" fontWeight="bold">
-              SW-01 ({selectedPlan?.switches_to_open.includes('SW-01') ? 'OPEN' : 'CLOSED'})
+              {switches[0]?.code || 'SW-01'} ({selectedPlan?.switches_to_open.includes(switches[0]?.code || 'SW-01') ? 'OPEN' : 'CLOSED'})
             </text>
 
-            {/* Branch to DTR-660115 */}
+            {/* Branch to DTR 1 */}
             <line x1="250" y1="98" x2="250" y2="150" stroke="#06b6d4" strokeWidth="2" strokeDasharray="3 3" />
             <rect x="235" y="150" width="30" height="24" rx="4" fill="#0284c7" />
             <text x="250" y="165" fill="#ffffff" textAnchor="middle" fontSize="9" fontWeight="bold">
-              DTR-15
+              DTR-01
             </text>
             <text x="250" y="186" fill="#94a3b8" textAnchor="middle" fontSize="8">
               160 kVA
@@ -1355,7 +1375,7 @@ export const SwitchingWorkbench: React.FC = () => {
               </g>
             ) : (
               <text x="340" y="82" fill="#64748b" textAnchor="middle" fontSize="9">
-                HL-2011951-14 (44m)
+                {faultedLineCode || faultableLines[1]?.code || 'Line-02'} ({faultableLines[1]?.length_km ? `${Math.round(faultableLines[1].length_km * 1000)}m` : '44m'})
               </text>
             )}
 
@@ -1366,21 +1386,21 @@ export const SwitchingWorkbench: React.FC = () => {
               r="8"
               fill="#0f172a"
               stroke={
-                selectedPlan?.switches_to_open.includes('SW-02') || (activeMode === 'flisr' && flisrReport)
+                selectedPlan?.switches_to_open.includes(switches[1]?.code || 'SW-02') || (activeMode === 'flisr' && flisrReport)
                   ? '#ef4444'
                   : '#10b981'
               }
               strokeWidth="3"
             />
             <text x="430" y="73" fill="#cbd5e1" textAnchor="middle" fontSize="9" fontWeight="bold">
-              SW-02 ({activeMode === 'flisr' && flisrReport ? 'ISOLATED' : 'CLOSED'})
+              {switches[1]?.code || 'SW-02'} ({activeMode === 'flisr' && flisrReport ? 'ISOLATED' : 'CLOSED'})
             </text>
 
-            {/* Branch to DTR-660118 */}
+            {/* Branch to DTR 2 */}
             <line x1="430" y1="98" x2="430" y2="150" stroke="#06b6d4" strokeWidth="2" strokeDasharray="3 3" />
             <rect x="415" y="150" width="30" height="24" rx="4" fill="#0284c7" />
             <text x="430" y="165" fill="#ffffff" textAnchor="middle" fontSize="9" fontWeight="bold">
-              DTR-18
+              DTR-02
             </text>
             <text x="430" y="186" fill="#94a3b8" textAnchor="middle" fontSize="8">
               100 kVA
@@ -1400,19 +1420,19 @@ export const SwitchingWorkbench: React.FC = () => {
               strokeWidth="3"
             />
             <text x="520" y="82" fill="#64748b" textAnchor="middle" fontSize="9">
-              HL-2011951-19 (43m)
+              {faultableLines[2]?.code || 'Branch Line 3'} ({faultableLines[2]?.length_km ? `${Math.round(faultableLines[2].length_km * 1000)}m` : '43m'})
             </text>
 
-            {/* Downstream Sectionalizer SW-03 / DTR-660119 */}
+            {/* Downstream Sectionalizer SW-03 / DTR 3 */}
             <circle cx="610" cy="90" r="8" fill="#0f172a" stroke="#10b981" strokeWidth="3" />
             <text x="610" y="73" fill="#cbd5e1" textAnchor="middle" fontSize="9" fontWeight="bold">
-              SW-03
+              {switches[2]?.code || (switches.length > 2 ? switches[2].code : 'SW-03')}
             </text>
 
             <line x1="610" y1="98" x2="610" y2="150" stroke="#06b6d4" strokeWidth="2" strokeDasharray="3 3" />
             <rect x="595" y="150" width="30" height="24" rx="4" fill="#0284c7" />
             <text x="610" y="165" fill="#ffffff" textAnchor="middle" fontSize="9" fontWeight="bold">
-              DTR-19
+              DTR-03
             </text>
             <text x="610" y="186" fill="#94a3b8" textAnchor="middle" fontSize="8">
               250 kVA

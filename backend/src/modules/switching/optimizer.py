@@ -1,5 +1,6 @@
 import time
 import math
+import copy
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -7,6 +8,7 @@ import networkx as nx
 from sqlalchemy.orm import Session
 
 from backend.src.models.network import Feeder, Bus, Line, Switch, DistributionTransformer
+from backend.src.modules.network.context import get_feeder_grid_context
 from backend.src.modules.physics.engine import build_network_from_db, run_ac_power_flow
 from backend.src.modules.switching.schemas import (
     SwitchingPlanCandidate,
@@ -40,6 +42,10 @@ def run_switching_optimization(
     
     if not feeder:
         raise ValueError(f"Feeder with code '{req.feeder_code}' not found in database.")
+
+    ctx = get_feeder_grid_context(db_session, feeder.code)
+    regulatory_name = ctx.regulatory_body or ctx.utility_short
+    acos_rate = 5.50
 
     # 1. Base Configuration AC Power Flow
     base_net, base_meta = build_network_from_db(
@@ -117,13 +123,11 @@ def run_switching_optimization(
             }
 
             try:
-                cand_net, cand_meta = build_network_from_db(
-                    db_session=db_session,
-                    feeder_code_or_id=feeder.code,
-                    ambient_temp_c=req.ambient_temp_c,
-                    load_multiplier=req.load_multiplier,
-                    switch_overrides=overrides,
-                )
+                # Fast in-memory net clone to avoid repeated database roundtrips
+                cand_net = copy.deepcopy(base_net)
+                cand_net.switch.loc[cand_net.switch.name == tie_sw.code, "closed"] = True
+                cand_net.switch.loc[cand_net.switch.name == sec_sw.code, "closed"] = False
+                cand_meta = base_meta
                 
                 # Check graph connectivity & radiality
                 H = nx.Graph()
@@ -166,7 +170,7 @@ def run_switching_optimization(
                     status = "VALIDATED_FEASIBLE"
                     status_reason = (
                         f"AC power flow converged in {cand_pf.execution_time_ms:.1f} ms. "
-                        f"Radiality strictly verified. Voltages within TGERC statutory band "
+                        f"Radiality strictly verified. Voltages within {regulatory_name} statutory band "
                         f"({cand_min_v} - {cand_max_v} p.u.) with zero thermal overloads."
                     )
                 elif cand_min_v >= 0.90 and cand_max_load <= 100.0:
@@ -237,6 +241,8 @@ def run_switching_optimization(
                 )
                 candidates.append(candidate)
                 plan_num += 1
+                if len(candidates) >= req.top_k:
+                    break
 
             except Exception as e:
                 # Catch simulation divergence or topology error

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, ShieldAlert, Cpu, Database, Compass, Zap, GitBranch, TrendingUp } from 'lucide-react';
-import { ProvenanceBadge } from './components/ProvenanceBadge';
-import { StatusBadge } from './components/StatusBadge';
 import { NetworkMap } from './views/NetworkMap';
 import { SwitchingWorkbench } from './views/SwitchingWorkbench';
 import { CapexPlanner } from './views/CapexPlanner';
+import { ScenarioSimulator } from './views/ScenarioSimulator';
+import { ExecutiveOverview } from './views/ExecutiveOverview';
+import { GridContextProvider, useGridContext } from './context/GridContext';
 
 interface SystemHealth {
   status: string;
@@ -41,6 +42,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   render() {
     if (this.state.hasError) {
+      const isHookError = Boolean(this.state.error?.message?.toLowerCase().includes('hook'));
       return (
         <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center select-none font-sans">
           <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4 shadow-xl">
@@ -53,7 +55,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <div className="flex items-center space-x-3">
             <button
               onClick={() => {
-                this.setState({ hasError: false, error: null });
+                if (isHookError) {
+                  window.location.reload();
+                } else {
+                  this.setState({ hasError: false, error: null });
+                }
               }}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-semibold shadow transition-all cursor-pointer"
             >
@@ -77,37 +83,29 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 }
 
 export const AppContent: React.FC = () => {
+  const { gridContext, activeTab, setActiveTab } = useGridContext();
   const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'switching' | 'capex' | 'scenarios'>(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(hash)) {
-      return hash as any;
-    }
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    if (tabParam && ['overview', 'map', 'switching', 'capex', 'scenarios'].includes(tabParam)) {
-      return tabParam as any;
-    }
-    return 'map'; // Default to map (Network Digital Twin)
-  });
   const [isMapFullscreen, setIsMapFullscreen] = useState<boolean>(false);
 
   useEffect(() => {
-    if (window.location.hash !== `#${activeTab}`) {
-      window.history.replaceState(null, '', `#${activeTab}`);
+    const rawHash = window.location.hash.replace('#', '').split('?')[0];
+    if (rawHash !== activeTab) {
+      const search = window.location.search;
+      const hashParams = window.location.hash.includes('?') ? `?${window.location.hash.split('?')[1]}` : '';
+      window.history.replaceState(null, '', `${search}#${activeTab}${hashParams}`);
     }
   }, [activeTab]);
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(hash)) {
-        setActiveTab((prev) => (prev !== hash ? (hash as any) : prev));
+      const rawHash = window.location.hash.replace('#', '').split('?')[0];
+      if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(rawHash)) {
+        setActiveTab(rawHash as any);
       }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [setActiveTab]);
 
   useEffect(() => {
     fetch('/api/v1/health')
@@ -120,9 +118,8 @@ export const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden ${
-        activeTab === 'map' ? 'h-screen overflow-hidden' : 'min-h-screen'
-      }`}
+      className={`bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden ${activeTab === 'map' ? 'h-screen overflow-hidden' : 'min-h-screen'
+        }`}
     >
       {/* Unified Slim App Navigation Header (Single 44px Row) */}
       {showTopBars && (
@@ -142,7 +139,7 @@ export const AppContent: React.FC = () => {
             {/* Advisory Pill with Tooltip */}
             <div
               className="hidden sm:flex items-center space-x-1 text-[10px] font-mono bg-amber-950/70 border border-amber-600/50 text-amber-300 px-2 py-0.5 rounded cursor-help"
-              title="ADVISORY-ONLY PLATFORM: No direct SCADA actuation. Recommendations require operator engineering sign-off. Target: KSEB • Kozhikode Distribution Circle • Feeder 2011951"
+              title={`ADVISORY-ONLY PLATFORM: No direct SCADA actuation. Recommendations require operator engineering sign-off. Target: ${gridContext?.utility_short || 'DISCOM'} • ${gridContext?.district || 'Distribution Circle'} • Feeder ${gridContext?.feeder_code || ''}`}
             >
               <ShieldAlert className="w-3 h-3 text-amber-400" />
               <span className="font-semibold">ADVISORY ONLY</span>
@@ -164,11 +161,10 @@ export const AppContent: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    isActive
-                      ? 'bg-blue-600 text-white font-semibold shadow'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${isActive
+                    ? 'bg-blue-600 text-white font-semibold shadow'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span className="hidden md:inline">{tab.label}</span>
@@ -185,9 +181,8 @@ export const AppContent: React.FC = () => {
             >
               <Database className="w-3 h-3 text-slate-400" />
               <span
-                className={`font-medium ${
-                  health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
-                }`}
+                className={`font-medium ${health?.database_connected ? 'text-emerald-400' : 'text-amber-400'
+                  }`}
               >
                 {health?.database_connected ? `DB: ${health.tables_count} tbls` : 'DB: ...'}
               </span>
@@ -208,13 +203,12 @@ export const AppContent: React.FC = () => {
       <main className="flex-1 min-h-0 relative w-full h-full overflow-hidden">
         {/* Network Map Tab (Preserved in DOM to prevent map reloads & re-fetches) */}
         <div
-          className={`w-full h-full ${
-            activeTab === 'map'
-              ? isMapFullscreen
-                ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
-                : 'relative w-full h-full p-0 m-0 overflow-hidden bg-slate-950'
-              : 'hidden'
-          }`}
+          className={`w-full h-full ${activeTab === 'map'
+            ? isMapFullscreen
+              ? 'fixed inset-0 z-50 w-screen h-screen p-0 m-0 overflow-hidden bg-slate-950'
+              : 'relative w-full h-full p-0 m-0 overflow-hidden bg-slate-950'
+            : 'hidden'
+            }`}
         >
           <NetworkMap
             isFullscreen={isMapFullscreen}
@@ -225,161 +219,28 @@ export const AppContent: React.FC = () => {
 
         {/* Scrollable Container for Standard Workspace Tabs */}
         <div
-          className={`w-full h-full p-6 space-y-6 overflow-y-auto ${
-            activeTab === 'map' ? 'hidden' : 'block'
-          }`}
+          className={`w-full h-full p-6 space-y-6 overflow-y-auto ${activeTab === 'map' ? 'hidden' : 'block'
+            }`}
         >
           {/* Executive Overview */}
-          <div className={activeTab === 'overview' ? 'block space-y-6' : 'hidden'}>
-            {/* Tier 1 Delivery Status Banner */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-xs uppercase font-mono tracking-wider text-blue-400">
-                    Milestone 4 Verification Gate
-                  </span>
-                  <h2 className="text-lg font-semibold text-white mt-1">
-                    Geospatial Digital Twin Visualization & Asset Inspection Operational
-                  </h2>
-                  <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-                    High-contrast electrical Single Line Diagram (SLD) map canvas with color-coded voltage symbology,
-                    loading thresholds, normally-open tie switch tracking, and inspectable mathematical provenance.
-                  </p>
-                </div>
-                <StatusBadge status="VALIDATED_FEASIBLE" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <span className="text-xs text-slate-500 font-mono">ASSET REGISTRY</span>
-                  <div className="text-base font-semibold text-slate-200 mt-1">20 Relational Models</div>
-                  <div className="mt-2">
-                    <ProvenanceBadge provenance="measured" />
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <span className="text-xs text-slate-500 font-mono">STATUTORY VOLTAGE</span>
-                  <div className="text-base font-semibold text-slate-200 mt-1">11 kV ± 6.0% Band</div>
-                  <div className="mt-2">
-                    <ProvenanceBadge provenance="assumed" />
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <span className="text-xs text-slate-500 font-mono">BROWNFIELD GIS TWIN</span>
-                  <div className="text-base font-semibold text-slate-200 mt-1">KSEB 4 DTRs / 33 HT Lines</div>
-                  <div className="mt-2">
-                    <ProvenanceBadge provenance="measured" />
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
-                  <span className="text-xs text-slate-500 font-mono">LOSS VALUATION</span>
-                  <div className="text-base font-semibold text-slate-200 mt-1">₹5.50 per kWh (ACoS)</div>
-                  <div className="mt-2">
-                    <ProvenanceBadge provenance="assumed" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Technical Principles & Gating Information */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-                  <ShieldAlert className="w-4 h-4 text-emerald-400" />
-                  <span>A5 Approval Taxonomy (Strictly Enforced)</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Every switching or capital recommendation receives exactly one status based on independent AC power
-                  flow convergence, radiality preservation, and protection data availability.
-                </p>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">AC Converged & Protected:</span>
-                    <StatusBadge status="VALIDATED_FEASIBLE" />
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Protection Unverified:</span>
-                    <StatusBadge status="FEASIBLE_PROTECTION_UNVERIFIED" />
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Constraint Violated:</span>
-                    <StatusBadge status="NOT_FEASIBLE" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-                  <Compass className="w-4 h-4 text-blue-400" />
-                  <span>Data Provenance Tracking</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Every metric, coordinate, and state is explicitly tagged. Fabricated simulation outputs or uncalibrated
-                  predictions are strictly prohibited.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <ProvenanceBadge provenance="measured" />
-                  <ProvenanceBadge provenance="estimated" />
-                  <ProvenanceBadge provenance="predicted" />
-                  <ProvenanceBadge provenance="synthetic" />
-                  <ProvenanceBadge provenance="assumed" />
-                </div>
-              </div>
-
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-                  <Cpu className="w-4 h-4 text-cyan-400" />
-                  <span>Next Milestone Gate: M5</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  AC Physics Engine integration with pandapower Newton-Raphson solver, limits verification, and contingency screening.
-                </p>
-                <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex justify-between items-center">
-                  <span>Ready for Milestone 5:</span>
-                  <span className="text-emerald-400 font-semibold">GATE CLEARED</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {activeTab === 'overview' && <ExecutiveOverview />}
 
           {/* Switching & FLISR Workbench */}
-          <div className={activeTab === 'switching' ? 'block' : 'hidden'}>
-            <SwitchingWorkbench />
-          </div>
+          {activeTab === 'switching' && <SwitchingWorkbench />}
 
           {/* CAPEX Intelligence Planner */}
-          <div className={activeTab === 'capex' ? 'block' : 'hidden'}>
-            <CapexPlanner />
-          </div>
+          {activeTab === 'capex' && <CapexPlanner />}
 
           {/* Scenario Simulator Sandbox */}
-          <div className={activeTab === 'scenarios' ? 'block' : 'hidden'}>
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-                <ShieldAlert className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-                Scenario Simulator Sandbox (Milestone 10)
-              </h3>
-              <p className="text-sm text-slate-400 max-w-md mx-auto">
-                In accordance with Non-negotiable Principle A4-11, this module is staged for delivery in its respective milestone.
-              </p>
-              <span className="inline-block px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono text-amber-400">
-                STATUS: STAGED IN PIPELINE
-              </span>
-            </div>
-          </div>
+          {activeTab === 'scenarios' && <ScenarioSimulator />}
         </div>
       </main>
 
       {/* Footer (hidden on full-bleed digital twin map) */}
       {activeTab !== 'map' && (
         <footer className="bg-slate-950 border-t border-slate-900 px-6 py-3 text-xs text-slate-500 flex justify-between items-center">
-          <span>GridSense-AI Platform &bull; KSEB (Kerala State Electricity Board)</span>
-          <span>Advisory Distribution Intelligence &bull; Kozhikode Puthiya Kadavu Feeder (2011951)</span>
+          <span>GridSense-AI Platform &bull; {gridContext?.utility_name || 'State Electricity Distribution Company'}</span>
+          <span>Advisory Distribution Intelligence &bull; {gridContext?.substation_name || 'Substation'} &bull; Feeder {gridContext?.feeder_code || ''}</span>
         </footer>
       )}
     </div>
@@ -389,7 +250,9 @@ export const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <GridContextProvider>
+        <AppContent />
+      </GridContextProvider>
     </ErrorBoundary>
   );
 };

@@ -15,6 +15,7 @@ import {
   Check,
 } from 'lucide-react';
 import { PowerFlowSummaryData } from './PhysicsSimulationBar';
+import { useGridContext } from '../context/GridContext';
 
 export interface GISLeftDockProps {
   isOpen: boolean;
@@ -93,6 +94,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
   heatmapActive,
   onToggleHeatmap,
 }) => {
+  const { gridContext } = useGridContext();
   const [loadMultiplier, setLoadMultiplier] = useState<number>(1.0);
   const [ambientTempC, setAmbientTempC] = useState<number>(35.0);
 
@@ -307,7 +309,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                       {powerFlowData.min_voltage_pu.toFixed(4)} p.u.
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
-                      KSERC &plusmn;6%
+                      {gridContext?.regulatory_band || 'SERC ±6%'}
                     </div>
                   </div>
                 </div>
@@ -393,7 +395,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-3 h-0.5 bg-slate-400 inline-block" />
                   <span className="text-slate-200">LT Lines & Cables</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">({summary?.total_lt_lines || 517})</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_lt_lines ?? 0})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -407,7 +409,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-pink-500 inline-block border border-white" />
                   <span className="text-slate-200">DTR Transformers</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">({summary?.total_dtrs || 4})</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_dtrs ?? 0})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -421,7 +423,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2 h-2 rounded-full bg-amber-700 inline-block border border-amber-950" />
                   <span className="text-slate-200">Standard Poles</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">({summary?.total_poles || 608})</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_poles ?? 0})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -435,7 +437,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2.5 h-2.5 rounded-xs bg-orange-600 inline-block border border-orange-400" />
                   <span className="text-slate-200">DP Structures</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">(13)</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_dp_structures ?? (summary?.total_switches ? Math.round(summary.total_switches * 0.9) : 0)})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -449,7 +451,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2.5 h-2.5 rounded-sm border border-emerald-400 inline-block" />
                   <span className="text-slate-200">Switches & Tie Points</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">({summary?.total_switches || 13})</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_switches ?? 0})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -463,7 +465,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
                   <span className="text-slate-200">33/11 kV Substation</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">(1)</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_substations ?? 1})</span>
               </label>
 
               <label className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/50 cursor-pointer border border-slate-800/80 transition-colors">
@@ -477,7 +479,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
                   <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
                   <span className="text-slate-200">Consumers</span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">(0)</span>
+                <span className="font-mono text-[11px] text-slate-400">({summary?.total_consumers ?? 0})</span>
               </label>
             </div>
           </div>
@@ -548,7 +550,7 @@ export const GISLeftDock: React.FC<GISLeftDockProps> = ({
 
       {/* 4. Dock Footer Summary */}
       <div className="px-3 py-2 bg-slate-950/90 border-t border-slate-800 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-        <span>KSEB Brownfield Dataset</span>
+        <span>{gridContext?.utility_short || 'GIS'} Brownfield Dataset</span>
         <span className="text-emerald-400 font-semibold">100% GIS SNAPPED</span>
       </div>
     </aside>

@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { SelectedAsset } from './AssetInspectionDrawer';
 
-const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
+const CARTO_API_KEY = (import.meta as any).env?.VITE_CARTO_API_KEY || '';
+const cartoKeyParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : '';
 
 interface DTRClusterZoomWindowProps {
   isOpen: boolean;
@@ -173,11 +174,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     if (name && (name.includes('DTR DP') || name.includes('DP LINE SIDE'))) {
       return 'DP-Structure';
     }
-    if (code.startsWith('PL-660118-')) return code.replace('PL-660118-', '');
-    if (code.startsWith('PL-660119-')) return code.replace('PL-660119-', '');
-    if (code.startsWith('PL-660115-')) return code.replace('PL-660115-', '');
-    if (code.startsWith('PL-2011951-')) return code.replace('PL-2011951-', 'P-');
     if (code.startsWith('PL-MANUAL-')) return 'P-Manual';
+    if (code.startsWith('PL-')) {
+      const parts = code.split('-');
+      return 'P-' + parts[parts.length - 1];
+    }
     if (code.startsWith('LC-') || code.startsWith('HL-') || code.startsWith('SW_')) {
       const parts = code.split('-');
       return parts[parts.length - 1] || code;
@@ -350,7 +351,10 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       if ((mapContainerRef.current as any)._leaflet_id) {
         delete (mapContainerRef.current as any)._leaflet_id;
       }
-      const center = centerCoords || [11.270127, 75.765721];
+      const center =
+        centerCoords && !isNaN(centerCoords[0]) && !isNaN(centerCoords[1])
+          ? centerCoords
+          : ([11.270127, 75.765721] as [number, number]);
       let map: L.Map;
       try {
         map = L.map(mapContainerRef.current, {
@@ -364,11 +368,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
         return;
       }
 
-      let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
       let nativeZoom = 18;
       let sub = 'abc';
       if (baseMap === 'carto-dark') {
-        tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+        tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
         nativeZoom = 18;
       } else if (baseMap === 'osm') {
         tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -411,8 +415,15 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
       mapInstanceRef.current = map;
       // Notify feature renderer that fresh map is ready
       setMapReady((v) => v + 1);
-    } else if (centerCoords) {
-      mapInstanceRef.current.setView(centerCoords, 21.5);
+    } else if (centerCoords && !isNaN(centerCoords[0]) && !isNaN(centerCoords[1]) && mapInstanceRef.current) {
+      try {
+        const size = mapInstanceRef.current.getSize();
+        if (size.x > 0 && size.y > 0) {
+          mapInstanceRef.current.setView(centerCoords, 21.5);
+        }
+      } catch (err) {
+        console.warn('Leaflet cluster zoom window setView guard:', err);
+      }
     }
 
     const timer = setTimeout(() => {
@@ -443,11 +454,11 @@ export const DTRClusterZoomWindow: React.FC<DTRClusterZoomWindowProps> = ({
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
 
-    let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+    let tileUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
     let nativeZoom = 18;
     let sub = 'abc';
     if (baseMap === 'carto-dark') {
-      tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
       nativeZoom = 18;
     } else if (baseMap === 'osm') {
       tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';

@@ -2,10 +2,15 @@ from typing import Any, Dict, Optional
 
 from backend.src.core.database import get_db
 from backend.src.models import DistributionTransformer, Feeder, Line, TopologyVersion
+from backend.src.modules.estimation.allocator import get_dtr_operating_loading_pct
 from backend.src.modules.network.benchmarks import (
     load_ieee33_benchmark,
     load_ieee69_benchmark,
     verify_benchmark,
+)
+from backend.src.modules.network.context import (
+    GridContextResponse,
+    get_feeder_grid_context,
 )
 from backend.src.modules.network.generator import TelanganaSyntheticNetworkGenerator
 from backend.src.modules.network.serialization import save_synthetic_network_to_db
@@ -134,6 +139,19 @@ def list_feeders(db: Session = Depends(get_db)):
             }
         )
     return results
+
+
+@router.get("/grid-context", response_model=GridContextResponse)
+def get_grid_context(
+    feeder_code: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> GridContextResponse:
+    """
+    Returns dynamically detected regional electricity board (e.g. KSEB, TSSPDCL, BESCOM),
+    regulatory body (e.g. KSERC, TGERC, KERC), state, climate archetype, and localized network metadata
+    for any ingested GDB or active feeder.
+    """
+    return get_feeder_grid_context(db_session=db, feeder_code=feeder_code)
 
 
 @router.get("/topology-versions")
@@ -368,17 +386,10 @@ def get_network_geojson(
             all_lons.append(dtr_coords[0])
             all_lats.append(dtr_coords[1])
 
-        # Calculate or assign loading based on feeder assets
-        loading_pct = 72.0
-        if "001" in dtr.code or "DTR_01" in dtr.code or "DTR_03" in dtr.code:
-            loading_pct = 108.5  # Overloaded DTR (Beach 2)
+        # Calculate or assign loading based on canonical DTR allocation
+        loading_pct = get_dtr_operating_loading_pct(dtr.code)
+        if loading_pct > 100.0:
             overloaded_count += 1
-        elif "003" in dtr.code:
-            loading_pct = 88.0   # Elevated Harbour DTR
-        elif "002" in dtr.code or dtr.rated_kva == 500.0:
-            loading_pct = 82.5   # Beach 3 (500 kVA)
-        elif "004" in dtr.code or "DTR_02" in dtr.code or "DTR_04" in dtr.code:
-            loading_pct = 68.4   # Beach 1 (250 kVA)
 
         dtr_features.append(
             {
@@ -604,7 +615,7 @@ def get_network_sld(
                 "parent_bus": parent_b.code if parent_b else None,
                 "rated_kva": dtr.rated_kva,
                 "phase_count": dtr.phase_count,
-                "loading_pct": 108.5 if "001" in dtr.code or "01" in dtr.code else (88.0 if "003" in dtr.code else (82.5 if "002" in dtr.code else 68.4)),
+                "loading_pct": get_dtr_operating_loading_pct(dtr.code),
                 "provenance": dtr.provenance,
             }
         )

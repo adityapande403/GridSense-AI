@@ -91,7 +91,14 @@ def test_iec60076_thermal_dynamics(db_session: Session):
     assert report.peak_hot_spot_temp_c >= report.peak_top_oil_temp_c
     assert report.peak_top_oil_temp_c >= report.peak_ambient_temp_c
     assert 0.0 <= report.asset_health_index <= 100.0
-    assert report.health_category in ["EXCELLENT", "GOOD", "DEGRADED", "CRITICAL"]
+    assert report.health_category in [
+        "EXCELLENT",
+        "GOOD",
+        "DEGRADED",
+        "CRITICAL",
+        "WARNING (THERMAL STRESS)",
+        "DEGRADED (OVERLOADED)",
+    ]
     assert report.cumulative_aging_hours_24h > 0.0
 
     for interval in report.time_series:

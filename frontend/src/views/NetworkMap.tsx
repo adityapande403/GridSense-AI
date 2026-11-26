@@ -10,13 +10,17 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
+  Search,
+  X,
 } from 'lucide-react';
 import { AssetInspectionDrawer, SelectedAsset } from '../components/AssetInspectionDrawer';
 import { GISLeftDock } from '../components/GISLeftDock';
 import { PowerFlowSummaryData } from '../components/PhysicsSimulationBar';
 import { ContingencyModal, ContingencyReportData } from '../components/ContingencyModal';
+import { useGridContext } from '../context/GridContext';
 
-const CARTO_API_KEY = 'cb1_5bc6_1_33507307e992fe96d084bfb5';
+const CARTO_API_KEY = (import.meta as any).env?.VITE_CARTO_API_KEY || '';
+const cartoKeyParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : '';
 
 const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const dy = (lat2 - lat1) * 111000;
@@ -105,6 +109,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   onToggleFullscreen,
   isActive = true,
 }) => {
+  const { feederCode, setFeederCode, targetAssetCode, setTargetAssetCode } = useGridContext();
   const [data, setData] = useState<NetworkGeoJSONResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +119,12 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   const [isClusterZoomOpen, setIsClusterZoomOpen] = useState<boolean>(true);
   const [isDockOpen, setIsDockOpen] = useState<boolean>(true);
   const [dockTab, setDockTab] = useState<'physics' | 'layers' | 'settings'>('physics');
+
+  // Universal Asset Search State
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Milestone 5: Physics Simulation Core (TR-PHY)
   const [powerFlowData, setPowerFlowData] = useState<PowerFlowSummaryData | null>(null);
@@ -282,9 +293,9 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       return;
     }
 
-    // Initial tile layer: Carto Voyager High-DPI (@2x) raster tiles with user's API key
+    // Initial tile layer: Carto Voyager High-DPI (@2x) raster tiles
     const tileLayer = L.tileLayer(
-      `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+      `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png${cartoKeyParam}`,
       {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -347,6 +358,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
     map.on('zoomend', handleZoomEnd);
 
     mapInstanceRef.current = map;
+    (window as any).__leafletMap = map;
 
     const timer = setTimeout(() => {
       map.invalidateSize();
@@ -354,6 +366,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
     return () => {
       clearTimeout(timer);
+      delete (window as any).__leafletMap;
       try {
         if (mapInstanceRef.current) {
           mapInstanceRef.current.remove();
@@ -387,20 +400,47 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   useEffect(() => {
     if (isActive && mapInstanceRef.current) {
       const t1 = setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
+        try {
+          mapInstanceRef.current?.invalidateSize();
+        } catch (e) {
+          // ignore
+        }
       }, 50);
       const t2 = setTimeout(() => {
         if (!mapInstanceRef.current) return;
-        mapInstanceRef.current.invalidateSize();
-        if (data?.bounds && data.bounds.length === 2) {
-          const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
-          mapInstanceRef.current.fitBounds(
-            [
-              [minLat, minLon],
-              [maxLat, maxLon],
-            ],
-            { padding: [40, 40], maxZoom: 17, animate: false }
-          );
+        try {
+          mapInstanceRef.current.invalidateSize();
+          const size = mapInstanceRef.current.getSize();
+          if (size.x <= 0 || size.y <= 0) return;
+
+          // CRITICAL: If an asset is already selected or deep-linked in URL/context, NEVER zoom out to full feeder!
+          const urlParams = new URLSearchParams(window.location.search);
+          const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+          const hashParams = new URLSearchParams(hashQuery);
+          const hasAssetDeepLink =
+            urlParams.get('asset') ||
+            hashParams.get('asset') ||
+            urlParams.get('dtr') ||
+            hashParams.get('dtr') ||
+            targetAssetCode;
+          if (hasAssetDeepLink || selectedAsset) {
+            return;
+          }
+
+          if (data?.bounds && data.bounds.length === 2) {
+            const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+            if (!isNaN(minLat) && !isNaN(minLon) && !isNaN(maxLat) && !isNaN(maxLon)) {
+              mapInstanceRef.current.fitBounds(
+                [
+                  [minLat, minLon],
+                  [maxLat, maxLon],
+                ],
+                { padding: [40, 40], maxZoom: 17, animate: false }
+              );
+            }
+          }
+        } catch (e) {
+          console.warn('fitBounds active tab guard caught:', e);
         }
       }, 200);
       return () => {
@@ -408,7 +448,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         clearTimeout(t2);
       };
     }
-  }, [isActive, data?.bounds]);
+  }, [isActive, data?.bounds, selectedAsset, targetAssetCode]);
 
   // 2. Handle Base Map Tile Layer Switch
   useEffect(() => {
@@ -416,18 +456,18 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
     mapInstanceRef.current.removeLayer(tileLayerRef.current);
 
-    let url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+    let url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
     let attr = '&copy; OpenStreetMap contributors &copy; CARTO';
     let sub = 'abc';
     let nativeZoom = 18;
 
     if (baseMap === 'carto-voyager') {
-      url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      url = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
       attr = '&copy; OpenStreetMap contributors &copy; CARTO';
       sub = 'abc';
       nativeZoom = 18;
     } else if (baseMap === 'carto-dark') {
-      url = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`;
+      url = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png${cartoKeyParam}`;
       attr = '&copy; OpenStreetMap contributors &copy; CARTO';
       sub = 'abc';
       nativeZoom = 18;
@@ -474,35 +514,17 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         setLoading(false);
         handleRunPowerFlow(1.0, 35.0);
 
-        // Auto-select DTR from URL if specified (e.g. ?dtr=DT-2011951-001)
+        // Universal auto-select from URL or hash query if specified (e.g. ?asset=... or ?dtr=...)
         try {
           const urlParams = new URLSearchParams(window.location.search);
-          const targetDtrCode = urlParams.get('dtr');
-          if (targetDtrCode && resData.transformers?.features) {
-            const dtrFeat = resData.transformers.features.find((f: any) => f.properties.code === targetDtrCode);
-            if (dtrFeat) {
-              const coords = dtrFeat.geometry?.coordinates;
-              const dtrAsset: SelectedAsset = {
-                id: dtrFeat.properties.id,
-                code: dtrFeat.properties.code,
-                name: dtrFeat.properties.name,
-                entity_type: 'distribution_transformer',
-                provenance: dtrFeat.properties.provenance,
-                confidence_score: dtrFeat.properties.confidence_score,
-                properties: {
-                  ...dtrFeat.properties,
-                  coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
-                },
-              };
-              setSelectedAsset(dtrAsset);
-              setIsClusterZoomOpen(true);
-              if (coords) {
-                mapInstanceRef.current?.flyTo([coords[1], coords[0]], 19.5, { duration: 0.8 });
-              }
-            }
+          const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+          const hashParams = new URLSearchParams(hashQuery);
+          const targetCode = urlParams.get('asset') || hashParams.get('asset') || urlParams.get('dtr') || hashParams.get('dtr');
+          if (targetCode) {
+            selectAssetByCodeOrName(targetCode, resData);
           }
         } catch (e) {
-          console.warn('URL dtr param parse failed:', e);
+          console.warn('URL asset param parse failed:', e);
         }
       })
       .catch((err) => {
@@ -512,7 +534,361 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
       });
   };
 
+  // Safe Map FlyTo / View Guard (prevents NaN / 0-size Leaflet exceptions & ensures main map zooms in)
+  const safeFlyTo = (targetLat: number, targetLon: number, zoom: number) => {
+    if (!mapInstanceRef.current) return;
+    if (isNaN(targetLat) || isNaN(targetLon)) return;
+    try {
+      const map = mapInstanceRef.current;
+      map.invalidateSize();
+      const size = map.getSize();
+      if (size.x > 0 && size.y > 0) {
+        map.flyTo([targetLat, targetLon], zoom, { duration: 0.8 });
+      } else {
+        map.setView([targetLat, targetLon], zoom);
+      }
+
+      // Reinforce zoom in after tab transition and drawer DOM layout stabilize
+      setTimeout(() => {
+        if (!mapInstanceRef.current) return;
+        try {
+          mapInstanceRef.current.invalidateSize();
+          mapInstanceRef.current.flyTo([targetLat, targetLon], zoom, { duration: 0.5 });
+        } catch (e) {
+          console.warn('deferred flyTo guard caught:', e);
+        }
+      }, 150);
+
+      setTimeout(() => {
+        if (!mapInstanceRef.current) return;
+        try {
+          mapInstanceRef.current.invalidateSize();
+          mapInstanceRef.current.flyTo([targetLat, targetLon], zoom, { duration: 0.3 });
+        } catch (e) {
+          console.warn('secondary deferred flyTo guard caught:', e);
+        }
+      }, 350);
+    } catch (e) {
+      console.warn('safeFlyTo guard caught:', e);
+    }
+  };
+
+  // 3b. Universal Multi-Layer Asset Selector (Transformers, Lines, Switches, Poles, Substations)
+  const selectAssetByCodeOrName = (rawQuery: string, networkData?: NetworkGeoJSONResponse): boolean => {
+    const d = networkData || data;
+    if (!rawQuery || !d) return false;
+    const q = rawQuery.trim().toLowerCase();
+    if (!q) return false;
+
+    // Helper matchers: exact code/name/id match first, then partial substring
+    const exactMatch = (feat: any) => {
+      const code = (feat.properties?.code || '').toLowerCase();
+      const name = (feat.properties?.name || '').toLowerCase();
+      const id = String(feat.properties?.id || '').toLowerCase();
+      return code === q || name === q || id === q;
+    };
+
+    const partialMatch = (feat: any) => {
+      const code = (feat.properties?.code || '').toLowerCase();
+      const name = (feat.properties?.name || '').toLowerCase();
+      const id = String(feat.properties?.id || '').toLowerCase();
+      return code.includes(q) || name.includes(q) || id.includes(q);
+    };
+
+    // 1. Check Distribution Transformers (DTRs)
+    let dtr = d.transformers?.features?.find(exactMatch) || d.transformers?.features?.find(partialMatch);
+    if (dtr) {
+      const coords = dtr.geometry?.coordinates;
+      const lat = coords ? coords[1] : 11.2687;
+      const lon = coords ? coords[0] : 75.7665;
+      const dtrAsset: SelectedAsset = {
+        id: dtr.properties.id,
+        code: dtr.properties.code,
+        name: dtr.properties.name,
+        entity_type: 'distribution_transformer',
+        provenance: dtr.properties.provenance,
+        confidence_score: dtr.properties.confidence_score,
+        properties: {
+          ...dtr.properties,
+          coordinates: [lat, lon],
+        },
+      };
+      setSelectedAsset(dtrAsset);
+      setIsClusterZoomOpen(true);
+      safeFlyTo(lat, lon, 19.5);
+      mapInstanceRef.current?.closePopup();
+      return true;
+    }
+
+    // 2. Check Primary / Section Lines (HT lines and LT lines)
+    let line = d.lines?.features?.find(exactMatch) || d.lines?.features?.find(partialMatch);
+    if (line) {
+      const coords = line.geometry?.coordinates;
+      if (coords && coords.length >= 2) {
+        const midIdx = Math.floor(coords.length / 2);
+        const mid = coords[midIdx];
+        const isHT = line.properties.is_ht !== false;
+
+        const polyline = linePolylinesRef.current[line.properties.code];
+        if (polyline) {
+          if (activePolylineRef.current) {
+            activePolylineRef.current.setStyle({
+              color: (activePolylineRef.current as any)._defaultColor,
+              weight: (activePolylineRef.current as any)._defaultWeight,
+            });
+          }
+          activePolylineRef.current = polyline;
+          polyline.setStyle({
+            color: '#38bdf8',
+            weight: isHT ? 7.0 : 5.0,
+            opacity: 1.0,
+          });
+        }
+
+        const lineAsset: SelectedAsset = {
+          id: line.properties.id,
+          code: line.properties.code,
+          name: line.properties.name || line.properties.code,
+          entity_type: 'line',
+          provenance: line.properties.provenance,
+          confidence_score: line.properties.confidence_score,
+          properties: {
+            ...line.properties,
+            coordinates: [mid[1], mid[0]],
+            coords_list: coords,
+          },
+        };
+        setSelectedAsset(lineAsset);
+        setIsClusterZoomOpen(true);
+        safeFlyTo(mid[1], mid[0], 18.5);
+        mapInstanceRef.current?.closePopup();
+        return true;
+      }
+    }
+
+    // 3. Check Sectionalizers & Switches
+    let sw = d.switches?.features?.find(exactMatch) || d.switches?.features?.find(partialMatch);
+    if (sw) {
+      const coords = sw.geometry?.coordinates;
+      const lat = coords ? coords[1] : 11.2687;
+      const lon = coords ? coords[0] : 75.7665;
+      const swAsset: SelectedAsset = {
+        id: sw.properties.id,
+        code: sw.properties.code,
+        name: sw.properties.name,
+        entity_type: 'switch',
+        provenance: sw.properties.provenance,
+        confidence_score: sw.properties.confidence_score,
+        properties: {
+          ...sw.properties,
+          coordinates: [lat, lon],
+        },
+      };
+      setSelectedAsset(swAsset);
+      setIsClusterZoomOpen(true);
+      safeFlyTo(lat, lon, 20);
+      mapInstanceRef.current?.closePopup();
+      return true;
+    }
+
+    // 4. Check Poles & DP Structures
+    let pole = d.poles?.features?.find(exactMatch) || d.poles?.features?.find(partialMatch);
+    if (pole) {
+      const coords = pole.geometry?.coordinates;
+      const lat = coords ? coords[1] : 11.2687;
+      const lon = coords ? coords[0] : 75.7665;
+      const isDP =
+        pole.properties.name?.includes('DP') ||
+        pole.properties.code?.includes('DP') ||
+        pole.properties.name?.includes('11kV DTR');
+      const poleAsset: SelectedAsset = {
+        id: pole.properties.id,
+        code: pole.properties.code,
+        name: pole.properties.name,
+        entity_type: 'pole',
+        provenance: pole.properties.provenance,
+        confidence_score: pole.properties.confidence_score,
+        properties: {
+          ...pole.properties,
+          is_dp_structure: isDP,
+          coordinates: [lat, lon],
+        },
+      };
+      setSelectedAsset(poleAsset);
+      setIsClusterZoomOpen(true);
+      safeFlyTo(lat, lon, 20.5);
+      mapInstanceRef.current?.closePopup();
+      return true;
+    }
+
+    // 5. Check Substations
+    let sub = d.substations?.features?.find(exactMatch) || d.substations?.features?.find(partialMatch);
+    if (sub) {
+      const coords = sub.geometry?.coordinates;
+      const lat = coords ? coords[1] : 11.2687;
+      const lon = coords ? coords[0] : 75.7665;
+      const subAsset: SelectedAsset = {
+        id: sub.properties.id,
+        code: sub.properties.code,
+        name: sub.properties.name,
+        entity_type: 'substation',
+        provenance: sub.properties.provenance,
+        confidence_score: sub.properties.confidence_score,
+        properties: {
+          ...sub.properties,
+          coordinates: [lat, lon],
+        },
+      };
+      setSelectedAsset(subAsset);
+      setIsClusterZoomOpen(true);
+      safeFlyTo(lat, lon, 18);
+      mapInstanceRef.current?.closePopup();
+      return true;
+    }
+
+    return false;
+  };
+
+  // Cross-Tab Navigation listener via GridContext
   useEffect(() => {
+    if (targetAssetCode && data) {
+      const found = selectAssetByCodeOrName(targetAssetCode, data);
+      if (found) {
+        setTargetAssetCode(null);
+      }
+    }
+  }, [targetAssetCode, data]);
+
+  // URL Hash change listener for direct deep-linking
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+      const hashParams = new URLSearchParams(hashQuery);
+      const targetCode = hashParams.get('asset') || hashParams.get('dtr');
+      if (targetCode && data) {
+        selectAssetByCodeOrName(targetCode, data);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [data]);
+
+  // Close search suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Compute live auto-suggestions across all layers dynamically
+  const matchingSuggestions = React.useMemo(() => {
+    if (!data || !searchQuery.trim() || searchQuery.trim().length < 1) return [];
+    const q = searchQuery.trim().toLowerCase();
+    const results: Array<{
+      code: string;
+      name?: string;
+      type: string;
+      badgeStyle: string;
+    }> = [];
+
+    // Transformers
+    data.transformers?.features?.forEach((f: any) => {
+      const code = f.properties?.code || '';
+      const name = f.properties?.name || '';
+      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+        results.push({
+          code,
+          name,
+          type: 'DTR',
+          badgeStyle: 'bg-pink-950/80 text-pink-300 border-pink-700/60',
+        });
+      }
+    });
+
+    // Switches
+    data.switches?.features?.forEach((f: any) => {
+      const code = f.properties?.code || '';
+      const name = f.properties?.name || '';
+      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+        results.push({
+          code,
+          name,
+          type: 'SWITCH',
+          badgeStyle: 'bg-purple-950/80 text-purple-300 border-purple-700/60',
+        });
+      }
+    });
+
+    // Lines (HT & LT)
+    data.lines?.features?.forEach((f: any) => {
+      const code = f.properties?.code || '';
+      const name = f.properties?.name || '';
+      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+        results.push({
+          code,
+          name,
+          type: f.properties?.is_ht !== false ? 'HT LINE' : 'LT LINE',
+          badgeStyle: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60',
+        });
+      }
+    });
+
+    // Poles
+    data.poles?.features?.forEach((f: any) => {
+      const code = f.properties?.code || '';
+      const name = f.properties?.name || '';
+      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+        results.push({
+          code,
+          name,
+          type: 'POLE',
+          badgeStyle: 'bg-amber-950/80 text-amber-300 border-amber-700/60',
+        });
+      }
+    });
+
+    // Substations
+    data.substations?.features?.forEach((f: any) => {
+      const code = f.properties?.code || '';
+      const name = f.properties?.name || '';
+      if (code.toLowerCase().includes(q) || name.toLowerCase().includes(q)) {
+        results.push({
+          code,
+          name,
+          type: 'SUB',
+          badgeStyle: 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60',
+        });
+      }
+    });
+
+    return results.slice(0, 8);
+  }, [data, searchQuery]);
+
+  const handleSearchSubmit = () => {
+    if (!searchQuery.trim()) return;
+    const found = selectAssetByCodeOrName(searchQuery.trim());
+    if (found) {
+      setSearchFeedback(null);
+      setIsSearchOpen(false);
+    } else {
+      setSearchFeedback(`No asset matching "${searchQuery.trim()}" found`);
+      setTimeout(() => setSearchFeedback(null), 3500);
+    }
+  };
+
+  // Bi-directional feeder synchronization with Global GridContext
+  useEffect(() => {
+    if (feederCode && feederCode !== selectedFeeder) {
+      setSelectedFeeder(feederCode);
+    }
+  }, [feederCode]);
+
+  useEffect(() => {
+    setFeederCode(selectedFeeder);
     setSelectedAsset(null);
     setIsClusterZoomOpen(false);
     fetchNetworkData(selectedFeeder);
@@ -527,76 +903,51 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
   // 4. Dedicated Fit Bounds: ONLY runs when new feeder data bounds load, NEVER on asset selection!
   useEffect(() => {
-    if (!data?.bounds || !mapInstanceRef.current || data.bounds.length !== 2) return;
-    const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
-    mapInstanceRef.current.fitBounds(
-      [
-        [minLat, minLon],
-        [maxLat, maxLon],
-      ],
-      { padding: [40, 40], maxZoom: 17, animate: true }
-    );
-    setTimeout(() => {
-      mapInstanceRef.current?.invalidateSize();
-    }, 150);
-  }, [data?.bounds]);
+    if (!isActive || !data?.bounds || !mapInstanceRef.current || data.bounds.length !== 2) return;
+    try {
+      const size = mapInstanceRef.current.getSize();
+      if (size.x <= 0 || size.y <= 0) return;
+
+      // Inhibit full feeder fitBounds if focusing or selecting an asset
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+      const hashParams = new URLSearchParams(hashQuery);
+      const hasAssetDeepLink =
+        urlParams.get('asset') ||
+        hashParams.get('asset') ||
+        urlParams.get('dtr') ||
+        hashParams.get('dtr') ||
+        targetAssetCode;
+      if (hasAssetDeepLink || selectedAsset) {
+        return;
+      }
+
+      const [[minLon, minLat], [maxLon, maxLat]] = data.bounds;
+      if (!isNaN(minLat) && !isNaN(minLon) && !isNaN(maxLat) && !isNaN(maxLon)) {
+        mapInstanceRef.current.fitBounds(
+          [
+            [minLat, minLon],
+            [maxLat, maxLon],
+          ],
+          { padding: [40, 40], maxZoom: 17, animate: true }
+        );
+      }
+      setTimeout(() => {
+        try {
+          mapInstanceRef.current?.invalidateSize();
+        } catch (e) {
+          // ignore
+        }
+      }, 150);
+    } catch (e) {
+      console.warn('fitBounds initial guard caught:', e);
+    }
+  }, [data?.bounds, isActive, selectedAsset, targetAssetCode]);
 
   // Expose global cluster zoom opener for Leaflet HTML popups
   useEffect(() => {
     (window as any).__openClusterZoom = (code: string) => {
-      // Check if it's a pole
-      const poleFeat = data?.poles?.features?.find((f: any) => f.properties.code === code);
-      if (poleFeat) {
-        const coords = poleFeat.geometry?.coordinates;
-        const isDP =
-          poleFeat.properties.name?.includes('DP') ||
-          poleFeat.properties.code?.includes('DP') ||
-          poleFeat.properties.name?.includes('11kV DTR');
-        const poleAsset: SelectedAsset = {
-          id: poleFeat.properties.id,
-          code: poleFeat.properties.code,
-          name: poleFeat.properties.name,
-          entity_type: 'pole',
-          provenance: poleFeat.properties.provenance,
-          confidence_score: poleFeat.properties.confidence_score,
-          properties: {
-            ...poleFeat.properties,
-            is_dp_structure: isDP,
-            coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
-          },
-        };
-        setSelectedAsset(poleAsset);
-        setIsClusterZoomOpen(true);
-        if (coords) {
-          mapInstanceRef.current?.flyTo([coords[1], coords[0]], 20, { duration: 0.8 });
-        }
-        mapInstanceRef.current?.closePopup();
-        return;
-      }
-
-      // Check if it's a DTR
-      const dtrFeat = data?.transformers?.features?.find((f: any) => f.properties.code === code);
-      if (dtrFeat) {
-        const coords = dtrFeat.geometry?.coordinates;
-        const dtrAsset: SelectedAsset = {
-          id: dtrFeat.properties.id,
-          code: dtrFeat.properties.code,
-          name: dtrFeat.properties.name,
-          entity_type: 'distribution_transformer',
-          provenance: dtrFeat.properties.provenance,
-          confidence_score: dtrFeat.properties.confidence_score,
-          properties: {
-            ...dtrFeat.properties,
-            coordinates: coords ? [coords[1], coords[0]] : [11.2687, 75.7665],
-          },
-        };
-        setSelectedAsset(dtrAsset);
-        setIsClusterZoomOpen(true);
-        if (coords) {
-          mapInstanceRef.current?.flyTo([coords[1], coords[0]], 19.5, { duration: 0.8 });
-        }
-        mapInstanceRef.current?.closePopup();
-      }
+      selectAssetByCodeOrName(code, data || undefined);
     };
 
     return () => {
@@ -1310,6 +1661,109 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           </div>
         </div>
 
+        {/* Dynamic Universal Asset Search Bar */}
+        <div ref={searchContainerRef} className="relative flex items-center min-w-[200px] max-w-[320px] flex-1 mx-2">
+          <div className="relative w-full flex items-center">
+            <input
+              type="text"
+              data-testid="asset-search-input"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setIsSearchOpen(true);
+                if (searchFeedback) setSearchFeedback(null);
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                } else if (e.key === 'Escape') {
+                  setIsSearchOpen(false);
+                }
+              }}
+              placeholder="Search asset / code..."
+              className={`w-full bg-slate-950/90 text-slate-100 text-[11px] font-mono placeholder:text-slate-500 pl-7 pr-14 py-1 rounded-lg border ${
+                searchFeedback
+                  ? 'border-rose-500/80 ring-1 ring-rose-500/30'
+                  : 'border-slate-700/80 focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/30'
+              } outline-none transition-all shadow-inner`}
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 pointer-events-none" />
+            <div className="absolute right-1 flex items-center gap-0.5">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                    setSearchFeedback(null);
+                  }}
+                  className="p-0.5 hover:text-white text-slate-400 cursor-pointer rounded"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="asset-search-button"
+                onClick={handleSearchSubmit}
+                className="px-1.5 py-0.5 bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 hover:text-white rounded text-[10px] font-mono font-bold transition-all cursor-pointer shadow flex items-center gap-1"
+                title="Search Asset"
+              >
+                <span>Find</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Auto-suggest dropdown when typing */}
+          {isSearchOpen && matchingSuggestions.length > 0 && (
+            <div
+              data-testid="asset-search-suggestions"
+              className="absolute top-full left-0 right-0 mt-1.5 bg-slate-900 border border-slate-700/90 rounded-xl shadow-2xl py-1 z-[700] max-h-60 overflow-y-auto divide-y divide-slate-800"
+            >
+              <div className="px-2 py-1 text-[10px] uppercase font-mono text-slate-400 tracking-wider flex justify-between">
+                <span>Matching Assets ({matchingSuggestions.length})</span>
+                <span className="text-[9px] text-slate-500">Inspect &rarr;</span>
+              </div>
+              {matchingSuggestions.map((item) => (
+                <button
+                  key={`${item.type}-${item.code}`}
+                  type="button"
+                  data-testid={`search-suggestion-${item.code}`}
+                  onClick={() => {
+                    selectAssetByCodeOrName(item.code);
+                    setSearchQuery(item.name ? `${item.name} (${item.code})` : item.code);
+                    setIsSearchOpen(false);
+                    setSearchFeedback(null);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 hover:bg-slate-800/80 flex items-center justify-between text-xs transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border font-mono shrink-0 ${item.badgeStyle}`}>
+                      {item.type}
+                    </span>
+                    <div className="truncate">
+                      <span className="font-mono font-semibold text-white group-hover:text-cyan-300">{item.code}</span>
+                      {item.name && item.name !== item.code && (
+                        <span className="ml-1.5 text-[11px] text-slate-400 truncate">{item.name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono group-hover:text-cyan-400 shrink-0 ml-2">Inspect</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {searchFeedback && (
+            <div className="absolute top-full left-0 mt-1 text-[10px] text-rose-400 bg-rose-950/90 border border-rose-800/80 px-2 py-0.5 rounded shadow z-[700] font-mono">
+              {searchFeedback}
+            </div>
+          )}
+        </div>
+
         {/* Live Summary Chips & Top Controls */}
         {data && (
           <div className="flex items-center space-x-2 text-xs font-mono">
@@ -1497,11 +1951,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           isClusterZoomOpen={isClusterZoomOpen}
           onOpenClusterZoom={() => setIsClusterZoomOpen((prev) => !prev)}
           onSelectAsset={(asset) => {
-            setSelectedAsset(asset);
-            if (asset.properties?.coordinates) {
-              const coords = asset.properties.coordinates;
-              mapInstanceRef.current?.flyTo([coords[0], coords[1]], 19.5, { duration: 0.8 });
-            }
+            selectAssetByCodeOrName(asset.code);
           }}
         />
       )}

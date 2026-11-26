@@ -24,6 +24,7 @@ build/
 .ruff_cache/
 .coverage
 htmlcov/
+*.log
 
 # Node & Frontend
 node_modules/
@@ -37,3 +38,10 @@ frontend/.vite/
 .DS_Store
 Thumbs.db
 image.png
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

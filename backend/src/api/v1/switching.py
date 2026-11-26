@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from backend.src.core.database import get_db
+from backend.src.models.audit import AuditLog
 from backend.src.models.network import Feeder, Switch, Bus
 from backend.src.modules.switching import (
     SwitchingOptimizationRequest,
@@ -116,6 +117,24 @@ def approve_switching_recommendation(
     # Generate immutable cryptographic audit hash
     hash_payload = f"{approval_id}:{req.plan_id}:{req.feeder_code}:{req.operator_id}:{ts}"
     audit_hash = hashlib.sha256(hash_payload.encode('utf-8')).hexdigest()
+
+    # Persist immutable audit log record to database (TR-SEC-02)
+    audit_record = AuditLog(
+        user_identifier=req.operator_id or "operator",
+        action_type="approve_switching_plan",
+        resource_type="switching_plan",
+        details_json={
+            "approval_id": approval_id,
+            "plan_id": req.plan_id,
+            "feeder_code": req.feeder_code,
+            "status": "APPROVED_STAGED_FOR_DISPATCH",
+            "audit_hash": audit_hash,
+            "notes": getattr(req, "engineering_justification", getattr(req, "notes", "Operator engineering approval verified")),
+            "timestamp": ts,
+        },
+    )
+    db.add(audit_record)
+    db.commit()
 
     return SwitchingApprovalResponse(
         approval_id=approval_id,
