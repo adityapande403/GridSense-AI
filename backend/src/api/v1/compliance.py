@@ -1,4 +1,4 @@
-"""FastAPI router for Milestone 11 & 12: Integrated Command Centre & Regulatory Compliance.
+"""FastAPI router for Integrated Command Centre & Regulatory Compliance.
 Provides multi-feeder aggregated telemetry, calculation audit transparency (TR-UI-04),
 immutable audit trail (TR-SEC-02), and one-click regulatory engineering audit reports.
 """
@@ -585,7 +585,7 @@ def export_regulatory_engineering_report(
     db: Session = Depends(get_db),
 ):
     """
-    Milestone 12: Generates comprehensive Regulatory Engineering Audit Report.
+    Generates comprehensive Regulatory Engineering Audit Report.
     Format 'html' returns high-resolution, print-ready document formatted for DISCOM & regulatory presentation.
     """
     feeder = db.query(Feeder).filter(Feeder.code == str(feeder_code)).first()

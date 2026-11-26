@@ -195,7 +195,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
     return false;
   });
 
-  // Milestone 6 & 7 State: Load Profile, Thermal Dynamics, ML Forecast
+  // DTR Analytics State: Load Profile, Thermal Dynamics, ML Forecast
   const [loadProfile, setLoadProfile] = useState<DTRLoadProfileReport | null>(null);
   const [thermalReport, setThermalReport] = useState<DTRThermalReport | null>(null);
   const [forecastReport, setForecastReport] = useState<DTRForecastReport | null>(null);
@@ -207,7 +207,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
 
   const props = asset?.properties || {};
 
-  // Fetch Milestone 6 & 7 data when a DTR is inspected
+  // Fetch DTR analytics data when a DTR is inspected
   useEffect(() => {
     if (!asset || asset.entity_type !== 'distribution_transformer') {
       setLoadProfile(null);
@@ -622,7 +622,7 @@ export const AssetInspectionDrawer: React.FC<AssetInspectionDrawerProps> = ({
           </div>
         </div>
 
-        {/* Milestone 6 & 7 Tab Bar for DTR */}
+        {/* DTR Analytics Tab Bar */}
         {isDtr && (
           <div className="grid grid-cols-4 border-b border-slate-800 bg-slate-950/90 text-xs font-semibold">
             <button

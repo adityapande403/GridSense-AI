@@ -1,4 +1,4 @@
-"""FastAPI router for Milestone 10 Scenario Simulator endpoints (TR-SCN-01..04)."""
+"""FastAPI router for Scenario Simulator endpoints (TR-SCN-01..04)."""
 
 import uuid
 from typing import List

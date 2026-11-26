@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Milestone 10: Scenario Simulator & Branch Sandbox', () => {
+test.describe('Scenario Simulator & Branch Sandbox', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#scenarios');
     await page.waitForLoadState('networkidle');
   });
 
   test('loads scenario simulator with authoritative twin immutability shield and baseline scorecard', async ({ page }) => {
-    // 1. Verify Page Title and Milestone 10 Badges
+    // 1. Verify Page Title and Authoritative Badges
     await expect(page.getByText('What-If Scenario Simulator & Branch Sandbox')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('TR-SCN-01..04')).toBeVisible();
 

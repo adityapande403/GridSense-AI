@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Milestones 11 & 12: Command Centre & Regulatory Compliance', () => {
+test.describe('Command Centre & Regulatory Compliance', () => {
   test('validates live aggregated telemetry, mathematical audit modals, and operator audit trail', async ({
     page,
   }) => {

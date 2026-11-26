@@ -295,7 +295,7 @@ export const ScenarioSimulator: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs uppercase font-mono tracking-wider text-blue-400 font-bold">
-                Milestone 10 Engine &bull; TR-SCN-01..04
+                AC Physics Mutation Engine &bull; TR-SCN-01..04
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
                 In-Memory Branch Sandbox

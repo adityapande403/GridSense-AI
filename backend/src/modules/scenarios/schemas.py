@@ -1,4 +1,4 @@
-"""Pydantic v2 schemas and data contracts for Milestone 10 Scenario Simulator (TR-SCN-01..04)."""
+"""Pydantic v2 schemas and data contracts for Scenario Simulator (TR-SCN-01..04)."""
 
 from enum import Enum
 from typing import Any, Dict, List, Optional

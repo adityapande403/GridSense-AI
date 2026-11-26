@@ -378,7 +378,7 @@ export const SwitchingWorkbench: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-mono uppercase tracking-widest text-blue-400 bg-blue-950/80 px-2.5 py-0.5 rounded border border-blue-800">
-                Tier 1 Screen 3 &bull; Milestone 8
+                Distribution Automation Core
               </span>
               <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
                 AC Newton-Raphson Verified

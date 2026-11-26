@@ -20,24 +20,24 @@ GridSense-AI integrates five specialized analytical and machine learning engines
 ```mermaid
 flowchart TD
     subgraph Data Layer
-        GIS[Brownfield GIS / FileGDB / GeoJSON] --> Twin[Authoritative Digital Twin DB]
-        SCADA[Telemetry & Diurnal Load Logs] --> Twin
+        GIS["Brownfield GIS / FileGDB / GeoJSON"] --> Twin["Authoritative Digital Twin DB"]
+        SCADA["Telemetry & Diurnal Load Logs"] --> Twin
     end
 
     subgraph Cyber-Physical Engines
-        Twin --> AC[Engine 1: pandapower Balanced AC Newton-Raphson]
-        Twin --> Therm[Engine 2: IEC 60076-7 Thermal Aging Model]
-        Twin --> GBDT[Engine 3: LightGBM Multi-Quantile Demand Forecaster]
-        Twin --> FLISR[Engine 4: Graph Min-Cut Switching & FLISR Optimizer]
-        Twin --> CAPEX[Engine 5: Load-Moment Centroid Bifurcation Optimizer]
+        Twin --> AC["Engine 1: pandapower Balanced AC Newton-Raphson"]
+        Twin --> Therm["Engine 2: IEC 60076-7 Thermal Aging Model"]
+        Twin --> GBDT["Engine 3: LightGBM Multi-Quantile Demand Forecaster"]
+        Twin --> FLISR["Engine 4: Graph Min-Cut Switching & FLISR Optimizer"]
+        Twin --> CAPEX["Engine 5: Load-Moment Centroid Bifurcation Optimizer"]
     end
 
     subgraph Governance & Safety
-        AC --> A5[A5 Approval Taxonomy Classifier]
+        AC --> A5["A5 Approval Taxonomy Classifier"]
         FLISR --> A5
         CAPEX --> A5
-        A5 --> Ledger[Immutable SHA-256 Operator Audit Trail TR-SEC-02]
-        Ledger --> UI[Operator Advisory Dashboard & Regulatory Audit Report]
+        A5 --> Ledger["Immutable SHA-256 Operator Audit Trail (TR-SEC-02)"]
+        Ledger --> UI["Operator Advisory Dashboard & Regulatory Audit Report"]
     end
 ```
 

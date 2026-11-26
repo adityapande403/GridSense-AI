@@ -1,4 +1,4 @@
-"""Unit tests for Milestone 11 & 12 Command Centre and Regulatory Compliance (TR-UI-04, TR-SEC-02)."""
+"""Unit tests for Command Centre and Regulatory Compliance (TR-UI-04, TR-SEC-02)."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -116,7 +116,7 @@ def test_audit_trail_retrieval_and_creation():
 
 
 def test_regulatory_engineering_report_export_json_and_html():
-    """Verifies Milestone 12 regulatory engineering audit report export in HTML and JSON."""
+    """Verifies regulatory engineering audit report export in HTML and JSON."""
     # JSON export
     json_res = client.get("/api/v1/compliance/export-report?feeder_code=2011951&format=json")
     assert json_res.status_code == 200

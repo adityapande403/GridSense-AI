@@ -170,7 +170,7 @@ export const ExecutiveOverview: React.FC = () => {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
-                Milestones 1–12 Operational Pipeline
+                Cyber-Physical Grid Intelligence
               </span>
               <span className="text-[11px] font-mono bg-blue-950/80 text-blue-300 border border-blue-800/80 px-2.5 py-0.5 rounded-full">
                 {systemData?.regulatory_body || 'SERC'} &bull; {systemData?.utility_name || 'DISCOM'} &bull; {systemData?.district || 'Circle'}

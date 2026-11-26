@@ -258,7 +258,7 @@ export const CapexPlanner: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-800">
-                Tier 1 Screen 4 &bull; Milestone 9
+                Asset Investment Intelligence
               </span>
               <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800">
                 15-Year NPV & Payback Engine

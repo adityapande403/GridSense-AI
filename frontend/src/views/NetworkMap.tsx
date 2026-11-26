@@ -126,7 +126,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Milestone 5: Physics Simulation Core (TR-PHY)
+  // AC Physics Simulation Core (TR-PHY)
   const [powerFlowData, setPowerFlowData] = useState<PowerFlowSummaryData | null>(null);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [heatmapActive, setHeatmapActive] = useState<boolean>(true);
@@ -892,7 +892,7 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
     setSelectedAsset(null);
     setIsClusterZoomOpen(false);
     fetchNetworkData(selectedFeeder);
-    // Fetch Milestone 7 Predictive Overload Early Warning Alerts
+    // Fetch Predictive Overload Early Warning Alerts
     fetch(`/api/v1/forecast/feeder-alerts?feeder_code=${selectedFeeder}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((alerts) => {

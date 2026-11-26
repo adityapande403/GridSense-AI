@@ -29,39 +29,39 @@ Powered by a balanced **AC Newton-Raphson non-linear power flow engine** (`panda
 ```mermaid
 flowchart TD
     subgraph Data Ingestion & Registry
-        GDB["Esri FileGDB (.gdb)"] --> Ingest[Dual Ingestion Adapter]
+        GDB["Esri FileGDB (.gdb)"] --> Ingest["Dual Ingestion Adapter"]
         GEO["GeoJSON FeatureCollection"] --> Ingest
-        Ingest --> Snap[Topology Snapping & Rejection Engine]
-        Snap --> DB[(Authoritative PostGIS / SQLite DB<br/>20 Relational Models)]
+        Ingest --> Snap["Topology Snapping & Rejection Engine"]
+        Snap --> DB[("Authoritative PostGIS / SQLite DB<br/>20 Relational Models")]
     end
 
     subgraph Physics & Intelligence Core
-        DB --> Pandapower[pandapower AC Newton-Raphson Solver]
-        DB --> Thermal[IEC 60076-7 Transformer Aging Engine]
-        DB --> Forecast[LightGBM Multi-Quantile Forecaster (P10/P50/P90)]
-        DB --> FLISR[Automated FLISR & Radial Switching Optimizer]
-        DB --> CAPEX[Load-Moment Centroid Bifurcation Optimizer]
+        DB --> Pandapower["pandapower AC Newton-Raphson Solver"]
+        DB --> Thermal["IEC 60076-7 Transformer Aging Engine"]
+        DB --> Forecast["LightGBM Multi-Quantile Demand Forecaster (P10/P50/P90)"]
+        DB --> FLISR["Automated FLISR & Radial Switching Optimizer"]
+        DB --> CAPEX["Load-Moment Centroid Bifurcation Optimizer"]
     end
 
     subgraph Isolated What-If Sandbox
-        DB -.->|Deep Copy & Hash Lock| Sandbox[In-Memory Branch Sandbox Engine]
-        Sandbox --> Mutations[DER Solar PV • EV Corridors • Organic Load • N-1]
-        Mutations --> DeltaScore[Side-by-Side AC Physics Delta Scorecard]
+        DB -.->|Deep Copy & Hash Lock| Sandbox["In-Memory Branch Sandbox Engine"]
+        Sandbox --> Mutations["DER Solar PV • EV Corridors • Organic Load • N-1"]
+        Mutations --> DeltaScore["Side-by-Side AC Physics Delta Scorecard"]
     end
 
     subgraph Operator Command Centre & Regulatory Compliance
-        Pandapower --> A5[A5 Approval Taxonomy Governance]
+        Pandapower --> A5["A5 Approval Taxonomy Governance"]
         FLISR --> A5
         CAPEX --> A5
-        A5 --> Ledger[Immutable SHA-256 Operator Audit Trail TR-SEC-02]
-        Ledger --> UI[React 18 / Vite High-Contrast SLD Canvas]
-        Ledger --> Report[One-Click Print-Ready Regulatory Audit Report]
+        A5 --> Ledger["Immutable SHA-256 Operator Audit Trail (TR-SEC-02)"]
+        Ledger --> UI["React 18 / Vite High-Contrast SLD Canvas"]
+        Ledger --> Report["One-Click Print-Ready Regulatory Audit Report"]
     end
 ```
 
 ---
 
-## Key Capabilities (Milestones 1–12 Pipeline)
+## Core Engineering Capabilities
 
 ### 1. Network Digital Twin & Micro-Topology Magnifier
 - High-contrast electrical Single Line Diagram (SLD) map canvas with color-coded voltage symbology ($<0.94\text{ pu}$ red, $0.94-1.06\text{ pu}$ green, $>1.06\text{ pu}$ yellow).

@@ -1,5 +1,5 @@
 """
-Unit Tests for Milestone 10: Scenario Simulator ("What-If" Sandbox) (TR-SCN-01..04).
+Unit Tests for Scenario Simulator ("What-If" Sandbox) (TR-SCN-01..04).
 Verifies:
 - Authoritative base twin immutability (TR-SCN-02).
 - In-memory branch-and-mutate sandbox execution (TR-SCN-01).
