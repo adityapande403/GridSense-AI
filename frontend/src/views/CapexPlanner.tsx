@@ -278,11 +278,10 @@ export const CapexPlanner: React.FC = () => {
           <div className="flex items-center bg-slate-950 border border-slate-800 p-1 rounded-xl shrink-0 overflow-x-auto">
             <button
               onClick={() => setActiveSubTab('reconductoring')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                activeSubTab === 'reconductoring'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeSubTab === 'reconductoring'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <GitBranch className="w-4 h-4" />
               <span>Reconductoring Ranker</span>
@@ -290,11 +289,10 @@ export const CapexPlanner: React.FC = () => {
 
             <button
               onClick={() => setActiveSubTab('dtr')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                activeSubTab === 'dtr'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeSubTab === 'dtr'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <Cpu className="w-4 h-4" />
               <span>3-Way DTR Decisions</span>
@@ -302,11 +300,10 @@ export const CapexPlanner: React.FC = () => {
 
             <button
               onClick={() => setActiveSubTab('bifurcation')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                activeSubTab === 'bifurcation'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeSubTab === 'bifurcation'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <Split className="w-4 h-4" />
               <span>Feeder Bifurcation</span>
@@ -314,11 +311,10 @@ export const CapexPlanner: React.FC = () => {
 
             <button
               onClick={() => setActiveSubTab('tornado')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                activeSubTab === 'tornado'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeSubTab === 'tornado'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <BarChart2 className="w-4 h-4" />
               <span>Tornado Sensitivity</span>
@@ -494,13 +490,12 @@ export const CapexPlanner: React.FC = () => {
                     >
                       <td className="p-3">
                         <span
-                          className={`w-6 h-6 rounded-full inline-flex items-center justify-center font-bold text-[11px] ${
-                            cand.rank === 1
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                              : cand.rank <= 3
+                          className={`w-6 h-6 rounded-full inline-flex items-center justify-center font-bold text-[11px] ${cand.rank === 1
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                            : cand.rank <= 3
                               ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50'
                               : 'bg-slate-800 text-slate-400'
-                          }`}
+                            }`}
                         >
                           #{cand.rank}
                         </span>
@@ -557,22 +552,20 @@ export const CapexPlanner: React.FC = () => {
                 <button
                   key={cand.dtr_id}
                   onClick={() => setSelectedDtr(cand)}
-                  className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-mono transition-all border ${
-                    isSelected
-                      ? 'bg-emerald-950/80 border-emerald-500 text-white shadow-md'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                  }`}
+                  className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-mono transition-all border ${isSelected
+                    ? 'bg-emerald-950/80 border-emerald-500 text-white shadow-md'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    }`}
                 >
                   <span className="font-bold">{cand.dtr_name ? `${cand.dtr_name} (${cand.dtr_code})` : cand.dtr_code}</span>
                   <span className="text-[10px] text-slate-400">({cand.rated_kva} kVA)</span>
                   <span
-                    className={`text-[9px] px-1 py-0.2 rounded font-bold ${
-                      cand.urgency_level === 'HIGH'
-                        ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                        : cand.urgency_level === 'MEDIUM'
+                    className={`text-[9px] px-1 py-0.2 rounded font-bold ${cand.urgency_level === 'HIGH'
+                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                      : cand.urgency_level === 'MEDIUM'
                         ? 'bg-amber-950 text-amber-300 border border-amber-800'
                         : 'bg-slate-800 text-slate-400'
-                    }`}
+                      }`}
                   >
                     {cand.urgency_level}
                   </span>
@@ -603,37 +596,37 @@ export const CapexPlanner: React.FC = () => {
                 </ClickableAsset>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono bg-slate-900 border border-slate-800 p-4 rounded-xl">
-              <div>
-                <span className="text-slate-500 block text-[10px]">CURRENT RATING</span>
-                <span className="font-bold text-white">{selectedDtr.rated_kva} kVA</span>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">CURRENT RATING</span>
+                  <span className="font-bold text-white">{selectedDtr.rated_kva} kVA</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">PEAK LOADING</span>
+                  <span className={`font-bold ${selectedDtr.current_loading_pct > 100 ? 'text-rose-400' : 'text-amber-400'}`}>
+                    {selectedDtr.current_loading_pct.toFixed(1)}% ({selectedDtr.peak_load_kva.toFixed(1)} kVA)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">TAIL-END VOLTAGE</span>
+                  <span className={`font-bold ${selectedDtr.tail_end_voltage_pu < 0.94 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {selectedDtr.tail_end_voltage_pu.toFixed(3)} pu
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">HEALTH INDEX</span>
+                  <span className="font-bold text-cyan-300">{selectedDtr.health_index.toFixed(1)} / 100</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">CONNECTED USERS</span>
+                  <span className="font-bold text-slate-200">{selectedDtr.connected_consumers} Consumers</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">PRIMARY JUSTIFICATION</span>
+                  <span className="text-[11px] text-emerald-400 font-semibold truncate block" title={selectedDtr.primary_justification}>
+                    {selectedDtr.recommended_option_type}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">PEAK LOADING</span>
-                <span className={`font-bold ${selectedDtr.current_loading_pct > 100 ? 'text-rose-400' : 'text-amber-400'}`}>
-                  {selectedDtr.current_loading_pct.toFixed(1)}% ({selectedDtr.peak_load_kva.toFixed(1)} kVA)
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">TAIL-END VOLTAGE</span>
-                <span className={`font-bold ${selectedDtr.tail_end_voltage_pu < 0.94 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                  {selectedDtr.tail_end_voltage_pu.toFixed(3)} pu
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">HEALTH INDEX</span>
-                <span className="font-bold text-cyan-300">{selectedDtr.health_index.toFixed(1)} / 100</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">CONNECTED USERS</span>
-                <span className="font-bold text-slate-200">{selectedDtr.connected_consumers} Consumers</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[10px]">PRIMARY JUSTIFICATION</span>
-                <span className="text-[11px] text-emerald-400 font-semibold truncate block" title={selectedDtr.primary_justification}>
-                  {selectedDtr.recommended_option_type}
-                </span>
-              </div>
-            </div>
             </div>
           )}
 
@@ -645,11 +638,10 @@ export const CapexPlanner: React.FC = () => {
                 return (
                   <div
                     key={opt.option_type}
-                    className={`rounded-2xl p-5 border flex flex-col justify-between transition-all relative overflow-hidden ${
-                      isRec
-                        ? 'bg-slate-900 border-emerald-500 shadow-xl ring-1 ring-emerald-500/50'
-                        : 'bg-slate-900/70 border-slate-800'
-                    }`}
+                    className={`rounded-2xl p-5 border flex flex-col justify-between transition-all relative overflow-hidden ${isRec
+                      ? 'bg-slate-900 border-emerald-500 shadow-xl ring-1 ring-emerald-500/50'
+                      : 'bg-slate-900/70 border-slate-800'
+                      }`}
                   >
                     {isRec && (
                       <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-mono font-bold px-3 py-1 rounded-bl-lg">
@@ -739,11 +731,10 @@ export const CapexPlanner: React.FC = () => {
         <div className="space-y-6">
           {/* Bifurcation Trigger Status Banner */}
           <div
-            className={`border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-              bifurcationData.is_bifurcation_triggered
-                ? 'bg-amber-950/40 border-amber-600/80 text-amber-200'
-                : 'bg-emerald-950/40 border-emerald-600/80 text-emerald-200'
-            }`}
+            className={`border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${bifurcationData.is_bifurcation_triggered
+              ? 'bg-amber-950/40 border-amber-600/80 text-amber-200'
+              : 'bg-emerald-950/40 border-emerald-600/80 text-emerald-200'
+              }`}
           >
             <div className="flex items-start space-x-3">
               {bifurcationData.is_bifurcation_triggered ? (
@@ -800,20 +791,18 @@ export const CapexPlanner: React.FC = () => {
                     <div
                       key={split.split_id}
                       onClick={() => setSelectedSplit(split)}
-                      className={`cursor-pointer rounded-xl p-4 border transition-all ${
-                        isSelected
-                          ? 'bg-purple-950/40 border-purple-500 shadow-md ring-1 ring-purple-500/50'
-                          : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
-                      }`}
+                      className={`cursor-pointer rounded-xl p-4 border transition-all ${isSelected
+                        ? 'bg-purple-950/40 border-purple-500 shadow-md ring-1 ring-purple-500/50'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${
-                              split.rank === 1
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${split.rank === 1
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                              : 'bg-slate-800 text-slate-300'
+                              }`}
                           >
                             #{split.rank}
                           </span>

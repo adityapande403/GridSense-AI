@@ -18,6 +18,8 @@ build/
 # Archives & Raw Zips
 *.zip
 *.tar.gz
+*.gdb/
+.extracted_gdb/
 
 # Testing & Linting
 .pytest_cache/

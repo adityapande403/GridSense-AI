@@ -349,11 +349,10 @@ export const ScenarioSimulator: React.FC = () => {
                 <button
                   key={preset.preset_id}
                   onClick={() => handleApplyPreset(preset)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    isActive
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
-                  }`}
+                  className={`p-3 rounded-xl border text-left transition-all ${isActive
+                    ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
+                    }`}
                 >
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="truncate pr-1">{preset.title.split('(')[0]}</span>
@@ -574,11 +573,10 @@ export const ScenarioSimulator: React.FC = () => {
                 </div>
                 {simResult && (
                   <div
-                    className={`inline-block text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                      simResult.kpis.delta_loss_kw <= 0
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                        : 'bg-rose-950 text-rose-300 border border-rose-800'
-                    }`}
+                    className={`inline-block text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${simResult.kpis.delta_loss_kw <= 0
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      : 'bg-rose-950 text-rose-300 border border-rose-800'
+                      }`}
                   >
                     {simResult.kpis.delta_loss_kw <= 0 ? '' : '+'}
                     {simResult.kpis.delta_loss_kw.toFixed(1)} kW ({simResult.kpis.delta_loss_pct > 0 ? '+' : ''}
@@ -596,20 +594,18 @@ export const ScenarioSimulator: React.FC = () => {
                   </span>
                   <ArrowRight className="w-3 h-3 text-slate-500" />
                   <span
-                    className={`text-base font-bold ${
-                      (simResult?.kpis.scenario_min_voltage_pu || 1.0) < 0.94 ? 'text-rose-400' : 'text-white'
-                    }`}
+                    className={`text-base font-bold ${(simResult?.kpis.scenario_min_voltage_pu || 1.0) < 0.94 ? 'text-rose-400' : 'text-white'
+                      }`}
                   >
                     {simResult?.kpis.scenario_min_voltage_pu.toFixed(4)} pu
                   </span>
                 </div>
                 {simResult && (
                   <div
-                    className={`inline-block text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                      simResult.kpis.delta_min_voltage_pu >= 0
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                        : 'bg-rose-950 text-rose-300 border border-rose-800'
-                    }`}
+                    className={`inline-block text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${simResult.kpis.delta_min_voltage_pu >= 0
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      : 'bg-rose-950 text-rose-300 border border-rose-800'
+                      }`}
                   >
                     {simResult.kpis.delta_min_voltage_pu >= 0 ? '+' : ''}
                     {simResult.kpis.delta_min_voltage_pu.toFixed(4)} pu
@@ -626,13 +622,12 @@ export const ScenarioSimulator: React.FC = () => {
                   </span>
                   <ArrowRight className="w-3 h-3 text-slate-500" />
                   <span
-                    className={`text-base font-bold ${
-                      (simResult?.kpis.scenario_max_line_loading_pct || 0) > 100
-                        ? 'text-rose-400'
-                        : (simResult?.kpis.scenario_max_line_loading_pct || 0) > 80
+                    className={`text-base font-bold ${(simResult?.kpis.scenario_max_line_loading_pct || 0) > 100
+                      ? 'text-rose-400'
+                      : (simResult?.kpis.scenario_max_line_loading_pct || 0) > 80
                         ? 'text-amber-400'
                         : 'text-white'
-                    }`}
+                      }`}
                   >
                     {simResult?.kpis.scenario_max_line_loading_pct.toFixed(1)}%
                   </span>
@@ -649,9 +644,8 @@ export const ScenarioSimulator: React.FC = () => {
                   </span>
                   <ArrowRight className="w-3 h-3 text-slate-500" />
                   <span
-                    className={`text-base font-bold ${
-                      (simResult?.kpis.scenario_overloaded_dtrs_count || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'
-                    }`}
+                    className={`text-base font-bold ${(simResult?.kpis.scenario_overloaded_dtrs_count || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'
+                      }`}
                   >
                     {simResult?.kpis.scenario_overloaded_dtrs_count || 0} Assets
                   </span>
@@ -707,11 +701,10 @@ export const ScenarioSimulator: React.FC = () => {
                   <button
                     key={t.id}
                     onClick={() => setAssetFilter(t.id as any)}
-                    className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-colors ${
-                      assetFilter === t.id
-                        ? 'bg-blue-600 text-white font-bold'
-                        : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-colors ${assetFilter === t.id
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
                   >
                     {t.label}
                   </button>
@@ -757,13 +750,12 @@ export const ScenarioSimulator: React.FC = () => {
                         </td>
                         <td className="px-3 py-2">
                           <span
-                            className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
-                              asset.delta_value > 0
-                                ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                                : asset.delta_value < 0
+                            className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${asset.delta_value > 0
+                              ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                              : asset.delta_value < 0
                                 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                                 : 'bg-slate-800 text-slate-400'
-                            }`}
+                              }`}
                           >
                             {asset.delta_value > 0 ? '+' : ''}
                             {asset.delta_value.toFixed(1)} {asset.unit}
@@ -771,13 +763,12 @@ export const ScenarioSimulator: React.FC = () => {
                         </td>
                         <td className="px-3 py-2">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              asset.scenario_status === 'overload'
-                                ? 'bg-rose-950 text-rose-400 border border-rose-800'
-                                : asset.scenario_status === 'elevated'
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${asset.scenario_status === 'overload'
+                              ? 'bg-rose-950 text-rose-400 border border-rose-800'
+                              : asset.scenario_status === 'elevated'
                                 ? 'bg-amber-950 text-amber-400 border border-amber-800'
                                 : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                            }`}
+                              }`}
                           >
                             {asset.scenario_status}
                           </span>

@@ -29,9 +29,12 @@ Powered by a balanced **AC Newton-Raphson non-linear power flow engine** (`panda
 ```mermaid
 flowchart TD
     subgraph Data Ingestion & Registry
-        GDB["Esri FileGDB (.gdb)"] --> Ingest["Dual Ingestion Adapter"]
+        GDB["Esri FileGDB (.zip / .gdb)"] --> Ingest["Multi-Source Ingestion Engine"]
         GEO["GeoJSON FeatureCollection"] --> Ingest
+        CSV["CSV Asset Registries"] --> Ingest
+        SCADA["SCADA / AMI Timeseries Telemetry"] --> SCADAAdapter["SCADA Ingestion Adapter"]
         Ingest --> Snap["Topology Snapping & Rejection Engine"]
+        SCADAAdapter --> DB
         Snap --> DB[("Authoritative PostGIS / SQLite DB<br/>20 Relational Models")]
     end
 
@@ -63,7 +66,13 @@ flowchart TD
 
 ## Core Engineering Capabilities
 
-### 1. Network Digital Twin & Micro-Topology Magnifier
+### 1. Dual-Pipeline Network GIS & SCADA Telemetry Ingestion Hub
+- **Enterprise GIS Ingestion**: Ingests zipped ESRI File Geodatabase archives (`.gdb.zip`), GeoJSON `FeatureCollection` datasets, and tabular CSV asset registries with automatic topology validation and row rejection reports.
+- **SCADA Timeseries Ingestion**: Substation 15-minute and hourly active/reactive power ($P_{\text{MW}}, Q_{\text{Mvar}}$) and bus voltage ($V_{\text{pu}}$) telemetry records.
+- **AMI/AMR Smart Meter & Environmental Logging**: Individual distribution transformer kW loadings, secondary phase currents, ambient temperature profiles, and solar radiation observations feeding thermal aging and predictive forecasting models.
+- **Zero-Dependency One-Click Seed**: One-click initialization with bundled demo feeder network and 24-hour SCADA timeseries (`POST /api/v1/ingest/seed-demo`).
+
+### 2. Network Digital Twin & Micro-Topology Magnifier
 - High-contrast electrical Single Line Diagram (SLD) map canvas with color-coded voltage symbology ($<0.94\text{ pu}$ red, $0.94-1.06\text{ pu}$ green, $>1.06\text{ pu}$ yellow).
 - Sub-second slide-in Asset Inspection Drawer dynamically linked to a **22x micro-topology cluster zoom magnifier** for high-density pole/DTR assemblies.
 - Universal asset code search with auto-suggest and instant map fly-to navigation.
@@ -130,6 +139,20 @@ flowchart TD
 - Single-click **"Export Regulatory Engineering Audit Report"**:
   - Generates a high-resolution, print-ready HTML/PDF document with official utility headers, statutory notices, asset registries, thermal assessments, and engineering sign-off blocks.
   - Also available as structured JSON (`format=json`).
+
+### 11. Multi-Format Ingestion Engine & SCADA Telemetry Hub
+- **Resilient Multi-Format Network Ingestion**:
+  - Direct on-the-fly extraction and topology validation of zipped ESRI File Geodatabase archives (`.gdb.zip`).
+  - Full GeoJSON FeatureCollection adapter with topological snapping, bus/line connectivity inferencing, and coordinate transformation.
+  - Tabular CSV asset registry ingestion with explicit row rejection logs and error codes.
+- **Operational SCADA & AMI Smart Meter Telemetry Ingestion**:
+  - Ingestion adapter for 15-minute / hourly substation active ($P\text{ MW}$) and reactive ($Q\text{ Mvar}$) power, bus voltage ($V\text{ p.u.}$), and DTR smart meter loadings ($P\text{ kW}$, current $I\text{ A}$, voltage $V$).
+  - Dynamic ambient temperature ($T\text{ }^\circ\text{C}$) and solar irradiance ($W/\text{m}^2$) environmental observation logs.
+  - Physics-based bounding validations and provenance tagging (`measured`).
+  - Cryptographic SHA-256 audit ledger entry recording each operational ingestion batch.
+- **One-Click Pre-Packaged Demo Twin**:
+  - Immediate digital twin setup (`POST /api/v1/ingest/seed-demo`) provisioning the KSEB 11 kV Feeder network and 24-hour diurnal SCADA measurements without requiring proprietary local GIS geodatabases.
+
 
 ---
 

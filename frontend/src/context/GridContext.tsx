@@ -33,7 +33,7 @@ export interface GridContextResponse {
   };
 }
 
-export type TabType = 'overview' | 'map' | 'switching' | 'capex' | 'scenarios';
+export type TabType = 'overview' | 'map' | 'switching' | 'capex' | 'scenarios' | 'ingest';
 
 interface GridContextType {
   gridContext: GridContextResponse | null;

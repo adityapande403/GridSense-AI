@@ -1,7 +1,9 @@
 import hashlib
 import json
 import logging
+import shutil
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -68,11 +70,41 @@ class FileGDBIngestionAdapter(BaseIngestionAdapter):
         else:
             self.conductor_specs = {}
 
+    def _extract_zip_gdb(self, zip_path: Path) -> Path:
+        """Extract a zip archive containing a FileGDB (.gdb) to an extraction cache."""
+        extract_dir = settings.BASE_DIR / ".extracted_gdb" / zip_path.stem
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        for item in extract_dir.rglob("*.gdb"):
+            if item.is_dir():
+                return item
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(extract_dir)
+        for item in extract_dir.rglob("*.gdb"):
+            if item.is_dir():
+                return item
+        if any(extract_dir.glob("*.gdbtable")):
+            return extract_dir
+        raise FileNotFoundError(f"No .gdb folder found inside zip archive: {zip_path}")
+
     def _resolve_gdb_path(self, source: Union[str, Path]) -> Path:
         p = Path(source)
-        if not p.exists():
-            raise FileNotFoundError(f"FileGDB dataset not found at path: {source}")
-        return p
+        if p.exists():
+            if p.suffix.lower() == ".zip" or (p.is_file() and zipfile.is_zipfile(p)):
+                return self._extract_zip_gdb(p)
+            return p
+        # Check potential zip fallback candidates
+        candidates = [
+            p.with_suffix(".zip"),
+            Path(str(p) + ".zip"),
+            p.with_suffix(".gdb.zip"),
+            settings.BASE_DIR / (p.name + ".zip"),
+            settings.BASE_DIR / (p.stem + ".gdb.zip"),
+            settings.BASE_DIR / "Puthiya Kadavu.gdb.zip",
+        ]
+        for c in candidates:
+            if c.exists() and zipfile.is_zipfile(c):
+                return self._extract_zip_gdb(c)
+        raise FileNotFoundError(f"FileGDB dataset or zip archive not found at: {source}")
 
     def validate(self, source: Union[str, Path, dict]) -> ValidationReport:
         """Inspect FileGDB layers, check required attributes and geometries, and build a ValidationReport."""

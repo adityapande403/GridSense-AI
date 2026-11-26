@@ -398,11 +398,10 @@ export const SwitchingWorkbench: React.FC = () => {
           <div className="flex items-center bg-slate-950 border border-slate-800 p-1 rounded-xl shrink-0">
             <button
               onClick={() => setActiveMode('reconfig')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeMode === 'reconfig'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeMode === 'reconfig'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <GitBranch className="w-4 h-4" />
               <span>Optimal Reconfiguration (TR-SWT)</span>
@@ -410,11 +409,10 @@ export const SwitchingWorkbench: React.FC = () => {
 
             <button
               onClick={() => setActiveMode('flisr')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeMode === 'flisr'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeMode === 'flisr'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
             >
               <AlertOctagon className="w-4 h-4" />
               <span>Automated FLISR (TR-FLI)</span>
@@ -544,11 +542,10 @@ export const SwitchingWorkbench: React.FC = () => {
             <button
               onClick={handleRunOptimization}
               disabled={isOptimizing}
-              className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${
-                isOptimizing
-                  ? 'bg-blue-800 text-blue-200 cursor-wait'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30'
-              }`}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${isOptimizing
+                ? 'bg-blue-800 text-blue-200 cursor-wait'
+                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/30'
+                }`}
             >
               {isOptimizing ? (
                 <>
@@ -719,20 +716,18 @@ export const SwitchingWorkbench: React.FC = () => {
                     <div
                       key={cand.plan_id}
                       onClick={() => setSelectedPlan(cand)}
-                      className={`cursor-pointer rounded-xl p-4 border transition-all ${
-                        isSelected
-                          ? 'bg-blue-950/40 border-blue-500 shadow-md ring-1 ring-blue-500/50'
-                          : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
-                      }`}
+                      className={`cursor-pointer rounded-xl p-4 border transition-all ${isSelected
+                        ? 'bg-blue-950/40 border-blue-500 shadow-md ring-1 ring-blue-500/50'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${
-                              cand.rank === 1
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${cand.rank === 1
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                              : 'bg-slate-800 text-slate-300'
+                              }`}
                           >
                             #{cand.rank}
                           </span>
@@ -822,11 +817,10 @@ export const SwitchingWorkbench: React.FC = () => {
                   return (
                     <div
                       key={stepKey}
-                      className={`border rounded-xl p-4 transition-all ${
-                        isChecked
-                          ? 'bg-emerald-950/20 border-emerald-800'
-                          : 'bg-slate-950/70 border-slate-800'
-                      }`}
+                      className={`border rounded-xl p-4 transition-all ${isChecked
+                        ? 'bg-emerald-950/20 border-emerald-800'
+                        : 'bg-slate-950/70 border-slate-800'
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start space-x-3">
@@ -847,11 +841,10 @@ export const SwitchingWorkbench: React.FC = () => {
                                 SEQUENCE #{step.sequence_order}
                               </span>
                               <span
-                                className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
-                                  isOpen
-                                    ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                                    : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                }`}
+                                className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOpen
+                                  ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                  : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  }`}
                               >
                                 {step.action} ({isOpen ? 'BREAK' : 'MAKE'})
                               </span>
@@ -885,11 +878,10 @@ export const SwitchingWorkbench: React.FC = () => {
 
                         <div className="text-right shrink-0">
                           <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                              isChecked
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
-                                : 'bg-slate-900 text-slate-500 border-slate-800'
-                            }`}
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded border ${isChecked
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                              : 'bg-slate-900 text-slate-500 border-slate-800'
+                              }`}
                           >
                             {isChecked ? 'VERIFIED' : 'PENDING'}
                           </span>
@@ -972,11 +964,10 @@ export const SwitchingWorkbench: React.FC = () => {
             <button
               onClick={() => handleRunFLISR()}
               disabled={isSimulatingFLISR}
-              className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${
-                isSimulatingFLISR
-                  ? 'bg-rose-900 text-rose-200 cursor-wait'
-                  : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/40'
-              }`}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${isSimulatingFLISR
+                ? 'bg-rose-900 text-rose-200 cursor-wait'
+                : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/40'
+                }`}
             >
               {isSimulatingFLISR ? (
                 <>
@@ -1101,11 +1092,10 @@ export const SwitchingWorkbench: React.FC = () => {
                       return (
                         <div
                           key={stepKey}
-                          className={`border rounded-xl p-4 transition-all ${
-                            isChecked
-                              ? 'bg-rose-950/20 border-rose-800'
-                              : 'bg-slate-950/70 border-slate-800'
-                          }`}
+                          className={`border rounded-xl p-4 transition-all ${isChecked
+                            ? 'bg-rose-950/20 border-rose-800'
+                            : 'bg-slate-950/70 border-slate-800'
+                            }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-start space-x-3">
@@ -1138,11 +1128,10 @@ export const SwitchingWorkbench: React.FC = () => {
                             </div>
 
                             <span
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                                isChecked
-                                  ? 'bg-rose-950 text-rose-300 border-rose-700'
-                                  : 'bg-slate-900 text-slate-500 border-slate-800'
-                              }`}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded border ${isChecked
+                                ? 'bg-rose-950 text-rose-300 border-rose-700'
+                                : 'bg-slate-900 text-slate-500 border-slate-800'
+                                }`}
                             >
                               {isChecked ? 'OPENED' : 'ARMED'}
                             </span>
@@ -1179,11 +1168,10 @@ export const SwitchingWorkbench: React.FC = () => {
                         <div
                           key={rPlan.restoration_id}
                           onClick={() => setSelectedRestorationPlan(rPlan)}
-                          className={`cursor-pointer rounded-xl p-4 border transition-all ${
-                            isSelected
-                              ? 'bg-emerald-950/40 border-emerald-500 shadow-md ring-1 ring-emerald-500/50'
-                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
-                          }`}
+                          className={`cursor-pointer rounded-xl p-4 border transition-all ${isSelected
+                            ? 'bg-emerald-950/40 border-emerald-500 shadow-md ring-1 ring-emerald-500/50'
+                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
@@ -1446,14 +1434,14 @@ export const SwitchingWorkbench: React.FC = () => {
               y2="90"
               stroke={
                 (activeMode === 'reconfig' && selectedPlan?.switches_to_close.includes('SW-TIE-01')) ||
-                (activeMode === 'flisr' && selectedRestorationPlan)
+                  (activeMode === 'flisr' && selectedRestorationPlan)
                   ? '#10b981'
                   : '#f59e0b'
               }
               strokeWidth="3"
               strokeDasharray={
                 (activeMode === 'reconfig' && selectedPlan?.switches_to_close.includes('SW-TIE-01')) ||
-                (activeMode === 'flisr' && selectedRestorationPlan)
+                  (activeMode === 'flisr' && selectedRestorationPlan)
                   ? 'none'
                   : '4 4'
               }
@@ -1469,7 +1457,7 @@ export const SwitchingWorkbench: React.FC = () => {
               fill="#0f172a"
               stroke={
                 (activeMode === 'reconfig' && selectedPlan?.switches_to_close.includes('SW-TIE-01')) ||
-                (activeMode === 'flisr' && selectedRestorationPlan)
+                  (activeMode === 'flisr' && selectedRestorationPlan)
                   ? '#10b981'
                   : '#f59e0b'
               }
@@ -1478,7 +1466,7 @@ export const SwitchingWorkbench: React.FC = () => {
             <text x="739" y="72" fill="#fbbf24" textAnchor="middle" fontSize="9" fontWeight="bold">
               SW-TIE-01 ({
                 (activeMode === 'reconfig' && selectedPlan?.switches_to_close.includes('SW-TIE-01')) ||
-                (activeMode === 'flisr' && selectedRestorationPlan)
+                  (activeMode === 'flisr' && selectedRestorationPlan)
                   ? 'CLOSED'
                   : 'NORM-OPEN'
               })
@@ -1614,11 +1602,10 @@ export const SwitchingWorkbench: React.FC = () => {
               <button
                 onClick={handleSubmitApproval}
                 disabled={isSubmittingApproval || !operatorId}
-                className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${
-                  isSubmittingApproval
-                    ? 'bg-emerald-800 text-emerald-200 cursor-wait'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50'
-                }`}
+                className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg ${isSubmittingApproval
+                  ? 'bg-emerald-800 text-emerald-200 cursor-wait'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50'
+                  }`}
               >
                 {isSubmittingApproval ? (
                   <>

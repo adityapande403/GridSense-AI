@@ -20,8 +20,8 @@ GridSense-AI integrates five specialized analytical and machine learning engines
 ```mermaid
 flowchart TD
     subgraph Data Layer
-        GIS["Brownfield GIS / FileGDB / GeoJSON"] --> Twin["Authoritative Digital Twin DB"]
-        SCADA["Telemetry & Diurnal Load Logs"] --> Twin
+        GIS["Brownfield GIS / FileGDB (.zip) / GeoJSON"] --> Twin["Authoritative Digital Twin DB"]
+        SCADA["SCADA Historian & AMI Telemetry"] --> Twin
     end
 
     subgraph Cyber-Physical Engines

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, ShieldAlert, Cpu, Database, Compass, Zap, GitBranch, TrendingUp } from 'lucide-react';
+import { Activity, ShieldAlert, Cpu, Database, Compass, Zap, GitBranch, TrendingUp, UploadCloud } from 'lucide-react';
 import { NetworkMap } from './views/NetworkMap';
 import { SwitchingWorkbench } from './views/SwitchingWorkbench';
 import { CapexPlanner } from './views/CapexPlanner';
 import { ScenarioSimulator } from './views/ScenarioSimulator';
 import { ExecutiveOverview } from './views/ExecutiveOverview';
+import { DataIngestion } from './views/DataIngestion';
 import { GridContextProvider, useGridContext } from './context/GridContext';
 
 interface SystemHealth {
@@ -99,7 +100,7 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     const handleHashChange = () => {
       const rawHash = window.location.hash.replace('#', '').split('?')[0];
-      if (['overview', 'map', 'switching', 'capex', 'scenarios'].includes(rawHash)) {
+      if (['overview', 'map', 'switching', 'capex', 'scenarios', 'ingest'].includes(rawHash)) {
         setActiveTab(rawHash as any);
       }
     };
@@ -154,6 +155,7 @@ export const AppContent: React.FC = () => {
               { id: 'switching', label: 'Switching & FLISR', icon: Zap },
               { id: 'capex', label: 'CAPEX Intelligence', icon: TrendingUp },
               { id: 'scenarios', label: 'Scenario Simulator', icon: GitBranch },
+              { id: 'ingest', label: 'Data Ingestion', icon: UploadCloud },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -233,6 +235,9 @@ export const AppContent: React.FC = () => {
 
           {/* Scenario Simulator Sandbox */}
           {activeTab === 'scenarios' && <ScenarioSimulator />}
+
+          {/* Data Ingestion & SCADA Hub */}
+          {activeTab === 'ingest' && <DataIngestion />}
         </div>
       </main>
 

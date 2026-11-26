@@ -1,3 +1,4 @@
+import pytest
 from backend.src.core.config import settings
 from backend.src.models.network import DistributionTransformer
 from backend.src.models.topology import TopologyVersion
@@ -6,12 +7,22 @@ from backend.src.modules.ingest.filegdb_adapter import FileGDBIngestionAdapter
 from backend.src.modules.ingest.geojson_adapter import GeoJSONIngestionAdapter
 
 
+def _get_test_gdb_path():
+    for candidate in [
+        settings.BASE_DIR / "Puthiya Kadavu.gdb" / "Puthiya Kadavu.gdb",
+        settings.BASE_DIR / "Puthiya Kadavu.gdb",
+        settings.BASE_DIR / "Puthiya Kadavu.gdb.zip",
+    ]:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def test_filegdb_validate_real_dataset():
-    """Verify validation of real Puthiya Kadavu FileGDB."""
-    gdb_path = settings.BASE_DIR / "Puthiya Kadavu.gdb" / "Puthiya Kadavu.gdb"
-    if not gdb_path.exists():
-        gdb_path = settings.BASE_DIR / "Puthiya Kadavu.gdb"
-    assert gdb_path.exists(), f"GDB path {gdb_path} should exist"
+    """Verify validation of real Puthiya Kadavu FileGDB or archive."""
+    gdb_path = _get_test_gdb_path()
+    if not gdb_path:
+        pytest.skip("Puthiya Kadavu FileGDB or zip archive not found locally")
 
     adapter = FileGDBIngestionAdapter()
     report = adapter.validate(gdb_path)
@@ -27,9 +38,9 @@ def test_filegdb_validate_real_dataset():
 
 def test_filegdb_ingest_to_database(db_session):
     """Verify end-to-end ingestion of Puthiya Kadavu dataset into database models."""
-    gdb_path = settings.BASE_DIR / "Puthiya Kadavu.gdb" / "Puthiya Kadavu.gdb"
-    if not gdb_path.exists():
-        gdb_path = settings.BASE_DIR / "Puthiya Kadavu.gdb"
+    gdb_path = _get_test_gdb_path()
+    if not gdb_path:
+        pytest.skip("Puthiya Kadavu FileGDB or zip archive not found locally")
 
     adapter = FileGDBIngestionAdapter()
     result = adapter.ingest(

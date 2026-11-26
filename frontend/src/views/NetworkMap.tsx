@@ -1190,21 +1190,17 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
         circleMarker.bindTooltip(
           `
-          <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid ${
-            isDP ? '#ea580c' : isDenseCluster ? '#f59e0b' : '#78350f'
+          <div style="background: #0f172a; color: #f8fafc; padding: 5px 8px; border-radius: 6px; font-family: monospace; font-size: 10px; border: 1px solid ${isDP ? '#ea580c' : isDenseCluster ? '#f59e0b' : '#78350f'
           };">
-            <div style="font-weight: bold; color: ${isDP ? '#fb923c' : '#fde047'};">${
-              poleFeat.properties.name || poleFeat.properties.code
-            }</div>
+            <div style="font-weight: bold; color: ${isDP ? '#fb923c' : '#fde047'};">${poleFeat.properties.name || poleFeat.properties.code
+          }</div>
             <div>${isDP ? '11 kV DP Substation Gantry' : 'Support Structure'} &bull; ${poleFeat.properties.voltage_level_kv || 0.415} kV</div>
-            ${
-              isDenseCluster
-                ? `<div style="color: #fb923c; font-weight: bold; margin-top: 2px;">📍 Cluster Node: ${neighborCount} poles within 35m</div>`
-                : ''
-            }
-            <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">${
-              isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Click to inspect & Micro-Zoom'
-            }</div>
+            ${isDenseCluster
+            ? `<div style="color: #fb923c; font-weight: bold; margin-top: 2px;">📍 Cluster Node: ${neighborCount} poles within 35m</div>`
+            : ''
+          }
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">${isDP ? 'Mounts DTR + DO Fuses + AB Switch' : 'Click to inspect & Micro-Zoom'
+          }</div>
           </div>
           `,
           { direction: 'top', offset: [0, -5], opacity: 1 }
@@ -1222,9 +1218,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
         const polePopupHtml = `
           <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 14px; width: 275px; box-sizing: border-box; background: #0f172a; color: #f8fafc; border-radius: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
-              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${
-                isDP ? '#fb923c' : '#f59e0b'
-              };">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${isDP ? '#fb923c' : '#f59e0b'
+          };">
                 ${isDP ? '11 kV DP GANTRY STRUCTURE' : 'SUPPORT STRUCTURE'}
               </span>
               <span style="font-size: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 4px;">
@@ -1488,11 +1483,10 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
           className: 'custom-dtr-icon',
           html: `
             <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; cursor: pointer;">
-              ${
-                isOverloaded
-                  ? '<div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: rgba(239,68,68,0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>'
-                  : ''
-              }
+              ${isOverloaded
+              ? '<div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: rgba(239,68,68,0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>'
+              : ''
+            }
               <div style="width: 16px; height: 16px; border-radius: 50%; background: ${color}; border: 2.5px solid #ffffff; box-shadow: 0 0 12px ${color}; display: flex; align-items: center; justify-content: center;">
                 <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></div>
               </div>
@@ -1606,9 +1600,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
   return (
     <div
-      className={`relative w-full ${
-        isFullscreen ? 'h-screen' : 'h-full'
-      } min-h-[500px] overflow-hidden bg-slate-950 select-none`}
+      className={`relative w-full ${isFullscreen ? 'h-screen' : 'h-full'
+        } min-h-[500px] overflow-hidden bg-slate-950 select-none`}
     >
       {/* 1. Giant Full-Bleed Leaflet Map Canvas Background */}
       <div
@@ -1638,9 +1631,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
       {/* 2. Top Floating Quick Feeder & Telemetry Status Pill */}
       <div
-        className={`absolute top-3 ${
-          isDockOpen ? 'left-[356px]' : 'left-36'
-        } right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex items-center justify-between gap-3 text-xs transition-all duration-300`}
+        className={`absolute top-3 ${isDockOpen ? 'left-[356px]' : 'left-36'
+          } right-3 z-[600] bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-4 py-2 shadow-2xl flex items-center justify-between gap-3 text-xs transition-all duration-300`}
       >
         <div className="flex items-center space-x-3 min-w-0">
           <div className="flex items-center space-x-2">
@@ -1683,11 +1675,10 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
                 }
               }}
               placeholder="Search asset / code..."
-              className={`w-full bg-slate-950/90 text-slate-100 text-[11px] font-mono placeholder:text-slate-500 pl-7 pr-14 py-1 rounded-lg border ${
-                searchFeedback
-                  ? 'border-rose-500/80 ring-1 ring-rose-500/30'
-                  : 'border-slate-700/80 focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/30'
-              } outline-none transition-all shadow-inner`}
+              className={`w-full bg-slate-950/90 text-slate-100 text-[11px] font-mono placeholder:text-slate-500 pl-7 pr-14 py-1 rounded-lg border ${searchFeedback
+                ? 'border-rose-500/80 ring-1 ring-rose-500/30'
+                : 'border-slate-700/80 focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/30'
+                } outline-none transition-all shadow-inner`}
             />
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 pointer-events-none" />
             <div className="absolute right-1 flex items-center gap-0.5">
@@ -1839,11 +1830,10 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
             {onToggleFullscreen && (
               <button
                 onClick={onToggleFullscreen}
-                className={`p-1 rounded-lg border transition-colors flex items-center space-x-1 ${
-                  isFullscreen
-                    ? 'bg-blue-600/30 border-blue-500 text-blue-300 hover:bg-blue-600/50'
-                    : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
+                className={`p-1 rounded-lg border transition-colors flex items-center space-x-1 ${isFullscreen
+                  ? 'bg-blue-600/30 border-blue-500 text-blue-300 hover:bg-blue-600/50'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
                 title={isFullscreen ? 'Exit Full Screen' : 'Full Screen Giant Map'}
               >
                 {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -1908,9 +1898,8 @@ export const NetworkMap: React.FC<NetworkMapProps> = ({
 
       {/* 6. Canvas Navigation Tools (Floating Bottom Left) */}
       <div
-        className={`absolute bottom-4 ${
-          isDockOpen ? 'left-[356px]' : 'left-4'
-        } z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-md transition-all duration-300`}
+        className={`absolute bottom-4 ${isDockOpen ? 'left-[356px]' : 'left-4'
+          } z-[500] flex items-center space-x-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-md transition-all duration-300`}
       >
         <button
           onClick={handleZoomIn}

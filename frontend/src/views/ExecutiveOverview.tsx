@@ -117,7 +117,7 @@ export const ExecutiveOverview: React.FC = () => {
       fetch('/api/v1/compliance/audit-trail')
         .then((r) => r.json())
         .then((d) => setAuditLogs(d))
-        .catch(() => {});
+        .catch(() => { });
     }, 1500);
   };
 
@@ -233,9 +233,8 @@ export const ExecutiveOverview: React.FC = () => {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Distribution Fleet</span>
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                (systemData?.overloaded_dtrs_total || 0) > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-              }`}>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${(systemData?.overloaded_dtrs_total || 0) > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                }`}>
                 {systemData?.overloaded_dtrs_total || 0} Overloaded
               </span>
             </div>
@@ -361,9 +360,8 @@ export const ExecutiveOverview: React.FC = () => {
                 return (
                   <tr
                     key={f.code}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      isActive ? 'bg-blue-950/20 font-semibold' : ''
-                    }`}
+                    className={`hover:bg-slate-800/40 transition-colors ${isActive ? 'bg-blue-950/20 font-semibold' : ''
+                      }`}
                   >
                     <td className="py-3 px-3">
                       <div className="flex items-center space-x-2">
